@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Controle de Canhotos</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: {} }
+    }
+  </script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Fonte -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Chart.js para o Gráfico Neon -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* =========================================================
+       TEMAS — equilibrados (nem branco puro, nem preto puro)
+       Claro  = azul-acinzentado suave
+       Escuro = azul-marinho profundo
+       ========================================================= */
+    :root {
+      color-scheme: light;
+      --bg-grad: radial-gradient(1100px 600px at 12% -10%, rgba(99,102,241,.22), transparent 60%),
+                 radial-gradient(900px 500px at 105% 110%, rgba(6,182,212,.20), transparent 60%),
+                 linear-gradient(135deg, #d2dcf0 0%, #e4eaf6 50%, #d6e0f2 100%);
+      --surface: #ebf0f9;
+      --surface-2: #dde5f3;
+      --surface-3: #cdd8ec;
+      --border: #b3c1dc;
+      --text: #1b2640;
+      --muted: #566684;
+      --input-bg: #f4f7fc;
+      --th-bg: #d5def0;
+      --row-alt: rgba(120,140,190,.10);
+      --row-hover: rgba(99,102,241,.14);
+      --header-bg: rgba(228,235,248,.78);
+      --accent: #4f46e5;
+      --shadow: 0 12px 30px -14px rgba(40,60,120,.45);
+      --hilite: rgba(255,255,255,.75);
+      --scroll: #a3b2d0;
+    }
+    .dark {
+      color-scheme: dark;
+      --bg-grad: radial-gradient(1100px 600px at 10% -10%, rgba(99,102,241,.28), transparent 60%),
+                 radial-gradient(900px 520px at 105% 110%, rgba(6,182,212,.20), transparent 60%),
+                 linear-gradient(135deg, #141b2f 0%, #1c2540 50%, #172038 100%);
+      --surface: #232d4a;
+      --surface-2: #2a3558;
+      --surface-3: #35426b;
+      --border: rgba(148,163,184,.24);
+      --text: #e6ebf7;
+      --muted: #9fb0d0;
+      --input-bg: #1a2239;
+      --th-bg: #1d2742;
+      --row-alt: rgba(148,163,184,.06);
+      --row-hover: rgba(129,140,248,.16);
+      --header-bg: rgba(27,36,62,.72);
+      --accent: #a5b4fc;
+      --shadow: 0 14px 34px -14px rgba(0,0,0,.55);
+      --hilite: rgba(255,255,255,.08);
+      --scroll: #3d4b75;
+    }
+
+    html, body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    body { background: var(--bg-grad); background-attachment: fixed; color: var(--text); transition: color .3s; }
+    .hidden { display: none !important; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    /* Utilitários de cor */
+    .t-muted { color: var(--muted); }
+    .t-accent { color: var(--accent); }
+
+    /* =========================================================
+       PAINÉIS / CAMPOS / BOTÕES
+       ========================================================= */
+    .panel {
+      background: linear-gradient(160deg, var(--surface), var(--surface-2));
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      box-shadow: var(--shadow), inset 0 1px 0 var(--hilite);
+      transition: background .3s, border-color .3s;
+    }
+    .inset {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: .85rem;
+    }
+    .lbl { display: block; font-size: .72rem; font-weight: 600; color: var(--muted); margin-bottom: .3rem; letter-spacing: .02em; }
+    .sec-title { font-size: .8rem; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: .55rem; }
+    .divider { border-top: 1px solid var(--border); }
+
+    .field {
+      width: 100%;
+      background: var(--input-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: .8rem;
+      padding: .6rem .9rem;
+      font-size: .85rem;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .field:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,.28), 0 0 14px rgba(129,140,248,.25); }
+    .field.field-error { border-color: #fb7185; box-shadow: 0 0 0 3px rgba(251,113,133,.20); }
+    .field::placeholder { color: var(--muted); opacity: .7; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+      padding: .55rem 1rem; border-radius: .8rem; font-size: .8rem; font-weight: 600;
+      color: var(--text); cursor: pointer;
+      background: linear-gradient(160deg, var(--surface-2), var(--surface-3));
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 var(--hilite);
+      transition: transform .2s, box-shadow .2s, border-color .2s;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: var(--accent); box-shadow: 0 6px 16px -8px rgba(99,102,241,.6), inset 0 1px 0 var(--hilite); }
+
+    .sheen { position: relative; overflow: hidden; }
+    .sheen::after {
+      content: ''; position: absolute; top: -60%; left: -90%; width: 45%; height: 220%;
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,.38), transparent);
+      transform: rotate(16deg); transition: left .75s ease; pointer-events: none;
+    }
+    .sheen:hover::after { left: 140%; }
+
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center; gap: .6rem;
+      width: 100%; padding: .9rem 1rem; border-radius: .9rem; cursor: pointer;
+      font-weight: 800; letter-spacing: .08em; font-size: .85rem; color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,.35);
+      background: linear-gradient(135deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 40%, rgba(0,0,0,.2) 100%),
+                  linear-gradient(160deg, #818cf8, #4f46e5 55%, #3730a3);
+      border: 1px solid rgba(165,180,252,.7);
+      box-shadow: 0 0 16px rgba(99,102,241,.55), 0 10px 22px -10px rgba(79,70,229,.8), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 6px rgba(0,0,0,.25);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 24px rgba(129,140,248,.85), 0 14px 26px -10px rgba(79,70,229,.9), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 6px rgba(0,0,0,.25); }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* Botão neon (Análise TOP 5) */
+    .neon-btn {
+      --neon-rgb: 129,140,248;
+      display: inline-flex; align-items: center; gap: .55rem; cursor: pointer;
+      padding: .6rem 1.1rem; border-radius: .85rem; font-size: .8rem; font-weight: 700;
+      color: var(--text);
+      background: rgba(var(--neon-rgb), .12);
+      border: 1px solid rgba(var(--neon-rgb), .85);
+      box-shadow: 0 0 10px rgba(var(--neon-rgb), .45), inset 0 0 10px rgba(var(--neon-rgb), .15);
+      transition: transform .2s, box-shadow .25s, background .25s;
+    }
+    .neon-btn i { color: rgb(var(--neon-rgb)); filter: drop-shadow(0 0 4px rgb(var(--neon-rgb))); }
+    .neon-btn:hover { transform: translateY(-2px); background: rgba(var(--neon-rgb), .22); box-shadow: 0 0 18px rgba(var(--neon-rgb), .8), 0 0 36px rgba(var(--neon-rgb), .35), inset 0 0 14px rgba(var(--neon-rgb), .25); }
+
+    /* =========================================================
+       SIDEBAR + MENUS NEON
+       ========================================================= */
+    .sidebar {
+      background: linear-gradient(180deg, var(--surface), var(--surface-2));
+      border-right: 1px solid var(--border);
+      box-shadow: 6px 0 24px -14px rgba(0,0,0,.45);
+    }
+    .brand-icon {
+      width: 2.8rem; height: 2.8rem; border-radius: .9rem; display: grid; place-items: center; color: #67e8f9;
+      background: linear-gradient(145deg, #1d2a52, #2a3a70);
+      border: 1px solid rgba(34,211,238,.75);
+      box-shadow: 0 0 14px rgba(34,211,238,.6), inset 0 0 12px rgba(34,211,238,.25);
+    }
+    .brand-icon i { filter: drop-shadow(0 0 6px #22d3ee); }
+    .brand-title { font-weight: 900; letter-spacing: .16em; font-size: .95rem; text-shadow: 0 0 10px rgba(34,211,238,.45); }
+
+    .nav-btn {
+      --neon-rgb: 34,211,238;
+      position: relative; width: 100%; display: flex; align-items: center; gap: .85rem;
+      padding: .85rem 1rem; border-radius: .95rem; cursor: pointer;
+      font-weight: 800; font-size: .78rem; letter-spacing: .1em; text-align: left;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid rgba(var(--neon-rgb), .35);
+      transition: transform .25s, box-shadow .25s, color .25s, border-color .25s, background .25s;
+    }
+    .nav-btn i { width: 1.25rem; text-align: center; color: rgb(var(--neon-rgb)); filter: drop-shadow(0 0 4px rgb(var(--neon-rgb))); }
+    .nav-btn:hover {
+      color: var(--text); transform: translateX(4px);
+      border-color: rgb(var(--neon-rgb));
+      background: rgba(var(--neon-rgb), .10);
+      box-shadow: 0 0 12px rgba(var(--neon-rgb), .55), inset 0 0 12px rgba(var(--neon-rgb), .15);
+    }
+    .nav-btn.active {
+      color: #fff; text-shadow: 0 0 8px rgb(var(--neon-rgb));
+      background: linear-gradient(135deg, rgba(var(--neon-rgb), .30), rgba(var(--neon-rgb), .08)), linear-gradient(135deg, #18214a, #2a3566);
+      border-color: rgb(var(--neon-rgb));
+      box-shadow: 0 0 14px rgba(var(--neon-rgb), .9), 0 0 34px rgba(var(--neon-rgb), .4), inset 0 0 14px rgba(var(--neon-rgb), .30);
+      animation: neonPulse 2.8s ease-in-out infinite;
+    }
+    .nav-btn.active i { color: #fff; filter: drop-shadow(0 0 6px rgb(var(--neon-rgb))); }
+    .nav-btn.nav-small { padding: .6rem .9rem; font-size: .7rem; justify-content: center; }
+    @keyframes neonPulse {
+      0%, 100% { box-shadow: 0 0 12px rgba(var(--neon-rgb), .8), 0 0 28px rgba(var(--neon-rgb), .30), inset 0 0 12px rgba(var(--neon-rgb), .25); }
+      50%      { box-shadow: 0 0 20px rgba(var(--neon-rgb), 1),  0 0 42px rgba(var(--neon-rgb), .50), inset 0 0 18px rgba(var(--neon-rgb), .38); }
+    }
+
+    .app-header { background: var(--header-bg); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); }
+    .user-chip {
+      display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .8rem; border-radius: 999px;
+      font-size: .72rem; font-weight: 700; color: var(--text);
+      background: rgba(129,140,248,.14); border: 1px solid rgba(129,140,248,.55);
+      box-shadow: 0 0 10px rgba(129,140,248,.25);
+    }
+
+    /* =========================================================
+       CARDS METÁLICOS
+       ========================================================= */
+    .metal {
+      --m1: #8fa3c4; --m2: #5a6f96; --m3: #34456a; --m-edge: rgba(200,215,240,.75); --m-glow: rgba(100,130,190,.55);
+      position: relative; overflow: hidden; border-radius: 1rem; padding: 1rem 1rem .95rem; color: #fff;
+      background:
+        radial-gradient(130% 95% at 15% 0%, rgba(255,255,255,.38) 0%, rgba(255,255,255,0) 58%),
+        linear-gradient(150deg, var(--m1) 0%, var(--m2) 52%, var(--m3) 100%);
+      border: 1px solid var(--m-edge);
+      box-shadow: 0 12px 24px -12px var(--m-glow), 0 0 0 1px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 6px rgba(0,0,0,.22);
+      transition: transform .25s ease, box-shadow .25s ease;
+      text-shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+    .metal::before { /* brilho acetinado suave, sem bordas marcadas */
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 48%, rgba(0,0,0,.10) 100%);
+      pointer-events: none;
+    }
+    .metal::after {
+      content: ''; position: absolute; top: -60%; left: -90%; width: 45%; height: 220%;
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,.4), transparent);
+      transform: rotate(16deg); transition: left .8s ease; pointer-events: none;
+    }
+    .metal:hover { transform: translateY(-4px); box-shadow: 0 18px 30px -12px var(--m-glow), 0 0 0 1px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -3px 8px rgba(0,0,0,.28); }
+    .metal:hover::after { left: 140%; }
+    .metal > * { position: relative; z-index: 1; }
+    .metal-lbl { font-size: .65rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; opacity: .95; margin-bottom: .2rem; }
+    .metal-num { font-size: 1.9rem; font-weight: 900; line-height: 1.1; letter-spacing: -.01em; }
+    .metal-ico { position: absolute !important; right: .8rem; top: .75rem; font-size: 1.15rem; opacity: .55; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+
+    .m-TOTAL      { --m1:#a3b6d6; --m2:#657ca6; --m3:#3a4d78; --m-edge:rgba(210,222,245,.85); --m-glow:rgba(101,124,166,.65); }
+    .m-PENDENTE   { --m1:#fbd067; --m2:#e29a1c; --m3:#a2650a; --m-edge:rgba(255,232,160,.9);  --m-glow:rgba(245,158,11,.60); }
+    .m-ENVIADO    { --m1:#74b1fd; --m2:#3877e6; --m3:#2146a8; --m-edge:rgba(178,212,255,.9);  --m-glow:rgba(59,130,246,.60); }
+    .m-IMPRESSO   { --m1:#c39bf9; --m2:#8456e0; --m3:#522b9c; --m-edge:rgba(218,196,255,.9);  --m-glow:rgba(139,92,246,.60); }
+    .m-RETORNO    { --m1:#fd8294; --m2:#e53a56; --m3:#9c1b36; --m-edge:rgba(255,190,200,.9);  --m-glow:rgba(244,63,94,.60); }
+    .m-TRANSFERIR { --m1:#4de2f0; --m2:#14a8c0; --m3:#0b6a84; --m-edge:rgba(165,242,250,.9);  --m-glow:rgba(6,182,212,.60); }
+    .m-RESOLVIDO  { --m1:#5eeab0; --m2:#19b07e; --m3:#0b7253; --m-edge:rgba(165,246,214,.9);  --m-glow:rgba(16,185,129,.60); }
+
+    /* Badges de status (tabela) */
+    .badge {
+      --rgb: 148,163,184; --tx-l: #475569; --tx-d: #cbd5e1;
+      display: inline-block; padding: .22rem .65rem; font-size: 10px; font-weight: 800; letter-spacing: .06em; border-radius: .55rem;
+      background: rgba(var(--rgb), .18); border: 1px solid rgba(var(--rgb), .55); color: var(--tx-l);
+    }
+    .dark .badge { color: var(--tx-d); }
+    .st-PENDENTE   { --rgb:245,158,11;  --tx-l:#92400e; --tx-d:#fcd34d; }
+    .st-ENVIADO    { --rgb:59,130,246;  --tx-l:#1e40af; --tx-d:#93c5fd; }
+    .st-IMPRESSO   { --rgb:139,92,246;  --tx-l:#5b21b6; --tx-d:#c4b5fd; }
+    .st-RETORNO    { --rgb:244,63,94;   --tx-l:#9f1239; --tx-d:#fda4af; }
+    .st-TRANSFERIR { --rgb:6,182,212;   --tx-l:#155e75; --tx-d:#67e8f9; }
+    .st-RESOLVIDO  { --rgb:16,185,129;  --tx-l:#065f46; --tx-d:#6ee7b7; }
+
+    /* =========================================================
+       TABELA
+       ========================================================= */
+    .tbl-wrap { max-height: 58vh; overflow: auto; }
+    .tbl { width: 100%; text-align: left; font-size: .75rem; white-space: nowrap; border-collapse: separate; border-spacing: 0; }
+    .tbl thead th {
+      position: sticky; top: 0; z-index: 2; padding: .9rem .9rem; background: var(--th-bg); color: var(--muted);
+      text-transform: uppercase; letter-spacing: .07em; font-weight: 800; font-size: .68rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .tbl tbody td { padding: .85rem .9rem; border-bottom: 1px solid var(--border); }
+    .tbl tbody tr:nth-child(even) { background: var(--row-alt); }
+    .tbl tbody tr { transition: background .15s; }
+    .tbl tbody tr:hover { background: var(--row-hover); }
+
+    /* =========================================================
+       ALERTAS / TOAST / SEGMENTADO
+       ========================================================= */
+    .alert { padding: 1rem; border-radius: .85rem; font-size: .75rem; font-weight: 600; border: 1px solid; display: flex; align-items: center; gap: .75rem; }
+    .alert-error { background: rgba(244,63,94,.14);  border-color: rgba(244,63,94,.5);  color: #be123c; }
+    .alert-ok    { background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.5); color: #047857; }
+    .alert-warn  { background: rgba(245,158,11,.16); border-color: rgba(245,158,11,.5); color: #b45309; }
+    .dark .alert-error { color: #fda4af; }
+    .dark .alert-ok    { color: #6ee7b7; }
+    .dark .alert-warn  { color: #fcd34d; }
+
+    .toast {
+      position: fixed; top: 1.25rem; right: 1.25rem; z-index: 300; display: flex; align-items: center; gap: .7rem;
+      padding: .9rem 1.2rem; border-radius: .9rem; font-size: .85rem; font-weight: 600; border: 1px solid;
+      transform: translateX(130%); transition: transform .35s cubic-bezier(.2,.8,.2,1);
+      box-shadow: 0 14px 34px -10px rgba(0,0,0,.5);
+    }
+    .toast.show { transform: translateX(0); }
+    .toast-success { background: #0f3d33; color: #a7f3d0; border-color: #10b981; box-shadow: 0 0 16px rgba(16,185,129,.45), 0 14px 34px -10px rgba(0,0,0,.5); }
+    .toast-warn    { background: #4a3410; color: #fde68a; border-color: #f59e0b; box-shadow: 0 0 16px rgba(245,158,11,.45), 0 14px 34px -10px rgba(0,0,0,.5); }
+    .toast-error   { background: #4a1426; color: #fecdd3; border-color: #f43f5e; box-shadow: 0 0 16px rgba(244,63,94,.45), 0 14px 34px -10px rgba(0,0,0,.5); }
+
+    .seg { display: flex; gap: .25rem; padding: .25rem; border-radius: .8rem; background: var(--input-bg); border: 1px solid var(--border); }
+    .seg-btn { padding: .4rem .8rem; border-radius: .6rem; font-size: .72rem; font-weight: 800; color: var(--muted); cursor: pointer; transition: all .2s; border: 1px solid transparent; }
+    .seg-btn:hover { color: var(--text); }
+    .seg-btn.active { color: #fff; background: linear-gradient(160deg, #818cf8, #4f46e5); box-shadow: 0 0 12px rgba(99,102,241,.6); }
+
+    .bar-track { width: 100%; height: .5rem; border-radius: 999px; overflow: hidden; background: var(--surface-3); }
+    .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #6366f1, #22d3ee); box-shadow: 0 0 10px rgba(99,102,241,.7); }
+
+    /* =========================================================
+       LETREIRO (título principal em movimento contínuo)
+       ========================================================= */
+    .marquee {
+      container-type: inline-size;
+      position: relative; overflow: hidden; width: 100%; min-width: 0;
+      font-size: 1.125rem; font-weight: 800; letter-spacing: -.01em;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 88%, transparent 100%);
+              mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 88%, transparent 100%);
+    }
+    .marquee-track { display: flex; width: max-content; animation: marqueeMove 20s linear infinite; will-change: transform; }
+    .marquee:hover .marquee-track { animation-play-state: paused; }
+    /* Cada bloco ocupa a largura inteira do letreiro e o texto fica encostado à direita:
+       o título nasce na ponta direita do painel e percorre tudo até sumir na esquerda. */
+    .marquee-item { flex: none; min-width: 900px; min-width: 100cqw; text-align: right; white-space: nowrap; }
+    @keyframes marqueeMove { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @media (prefers-reduced-motion: reduce) { .marquee-track { animation: none; } }
+    /* Resumo de pendências exibido antes do título no letreiro */
+    .mq-warn   { color: #b45309; }
+    .mq-danger { color: #be123c; }
+    .mq-ok     { color: #047857; }
+    .dark .mq-warn   { color: #fcd34d; }
+    .dark .mq-danger { color: #fda4af; }
+    .dark .mq-ok     { color: #6ee7b7; }
+    .mq-sep { opacity: .55; margin: 0 .35rem; }
+
+    /* =========================================================
+       ÍCONE NEON DE DOCUMENTOS (login)
+       ========================================================= */
+    .neon-doc-box {
+      width: 4.6rem; height: 4.6rem; border-radius: 1.25rem; display: grid; place-items: center;
+      background: linear-gradient(145deg, #121a3a, #232f66);
+      border: 1.5px solid #22d3ee;
+      box-shadow: 0 0 12px rgba(34,211,238,.85), 0 0 32px rgba(34,211,238,.40), inset 0 0 18px rgba(34,211,238,.28);
+      animation: neonBreath 3.2s ease-in-out infinite;
+    }
+    .neon-doc { width: 2.9rem; height: 2.9rem; overflow: visible; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.2; }
+    .neon-doc .front { stroke: #67e8f9; filter: drop-shadow(0 0 3px #22d3ee) drop-shadow(0 0 9px rgba(34,211,238,.85)); }
+    .neon-doc .back  { stroke: #f0abfc; filter: drop-shadow(0 0 3px #e879f9) drop-shadow(0 0 9px rgba(232,121,249,.85)); }
+    .neon-doc .lines { animation: neonFlicker 6s infinite; }
+    @keyframes neonBreath {
+      0%, 100% { box-shadow: 0 0 10px rgba(34,211,238,.75), 0 0 26px rgba(34,211,238,.32), inset 0 0 14px rgba(34,211,238,.22); }
+      50%      { box-shadow: 0 0 18px rgba(34,211,238,1),   0 0 42px rgba(34,211,238,.50), inset 0 0 22px rgba(34,211,238,.36); }
+    }
+    @keyframes neonFlicker { 0%, 100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: .55; } 94% { opacity: 1; } 96% { opacity: .7; } 97% { opacity: 1; } }
+
+    /* =========================================================
+       TELA DE LOGIN
+       ========================================================= */
+    .login-screen {
+      position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1.25rem;
+      background: var(--bg-grad); overflow: hidden; transition: opacity .45s ease, transform .45s ease;
+    }
+    .login-screen.closing { opacity: 0; transform: scale(1.03); pointer-events: none; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; animation: floaty 12s ease-in-out infinite; }
+    .orb-1 { width: 380px; height: 380px; background: #6366f1; top: -100px; left: -80px; }
+    .orb-2 { width: 320px; height: 320px; background: #06b6d4; bottom: -90px; right: -60px; animation-delay: -4s; }
+    .orb-3 { width: 240px; height: 240px; background: #d946ef; top: 55%; left: 58%; opacity: .32; animation-delay: -8s; }
+    @keyframes floaty { 0%,100% { transform: translate(0,0); } 50% { transform: translate(30px,-26px); } }
+
+    .login-theme { position: absolute; top: 1.25rem; right: 1.25rem; z-index: 3; }
+    .login-card { position: relative; z-index: 2; width: 100%; max-width: 24rem; padding: 2.2rem 2rem 1.8rem; overflow: hidden; }
+    .login-card::before {
+      content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+      background: linear-gradient(90deg, #22d3ee, #6366f1, #d946ef); box-shadow: 0 0 14px rgba(99,102,241,.9);
+    }
+    .login-card.shake { animation: shake .45s; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+    .field-wrap { position: relative; }
+    .field-wrap .ico { position: absolute; left: .95rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: .85rem; }
+    .field-wrap .field { padding: .8rem 2.6rem .8rem 2.6rem; font-size: .9rem; }
+    .field-wrap .eye { position: absolute; right: .6rem; top: 50%; transform: translateY(-50%); width: 2rem; height: 2rem; display: grid; place-items: center; color: var(--muted); cursor: pointer; border-radius: .5rem; }
+    .field-wrap .eye:hover { color: var(--accent); }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex">
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast"></div>
+
+  <!-- ================= TELA DE LOGIN ================= -->
+  <div id="login-screen" class="login-screen">
+    <button class="btn login-theme" onclick="toggleTheme()" title="Alternar modo claro/escuro">
+      <i id="theme-icon-login" class="fa-solid fa-moon"></i>
+    </button>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div id="login-card" class="login-card panel">
+      <div class="flex flex-col items-center text-center mb-7">
+        <div class="neon-doc-box mb-4" aria-hidden="true">
+          <svg class="neon-doc" viewBox="0 0 48 48">
+            <path class="back" d="M8 34V8a2 2 0 0 1 2-2h14"/>
+            <g class="front">
+              <path d="M16 12h13l8 8v20a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2V14a2 2 0 0 1 2-2z"/>
+              <path d="M29 12v6a2 2 0 0 0 2 2h6"/>
+            </g>
+            <g class="front lines">
+              <path d="M20 26h12"/><path d="M20 31h12"/><path d="M20 36h7"/>
+            </g>
+          </svg>
+        </div>
+        <h1 class="brand-title text-xl">CANHOTOS</h1>
+        <p class="text-xs t-muted mt-1">Painel de Controle · Acesso restrito</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)" autocomplete="off" class="space-y-4">
+        <div>
+          <label class="lbl" for="login-user">Usuário</label>
+          <div class="field-wrap">
+            <i class="fa-solid fa-user ico"></i>
+            <input id="login-user" type="text" class="field" placeholder="@usuario" autocomplete="username" autocapitalize="off" spellcheck="false" enterkeyhint="next">
+          </div>
+        </div>
+
+        <div>
+          <label class="lbl" for="login-pass">Senha</label>
+          <div class="field-wrap">
+            <i class="fa-solid fa-lock ico"></i>
+            <input id="login-pass" type="password" class="field" placeholder="••••••" autocomplete="current-password">
+            <span class="eye" onclick="togglePassword()" title="Mostrar/ocultar senha"><i id="eye-icon" class="fa-solid fa-eye"></i></span>
+          </div>
+        </div>
+
+        <div id="login-error" class="hidden alert alert-error">
+          <i class="fa-solid fa-circle-xmark"></i>
+          <span>Usuário ou senha incorretos.</span>
+        </div>
+
+        <button type="submit" class="btn-primary sheen mt-2">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>ENTRAR</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- SIDEBAR (MENU ESQUERDO) -->
+  <aside class="sidebar w-64 flex flex-col justify-between shrink-0 select-none">
+    <div>
+      <!-- BRANDING / LOGO -->
+      <div class="p-6 flex items-center space-x-3" style="border-bottom:1px solid var(--border)">
+        <div class="brand-icon">
+          <i class="fa-solid fa-file-invoice fa-lg"></i>
+        </div>
+        <div>
+          <h1 class="brand-title">CANHOTOS</h1>
+          <p class="text-xs t-muted">Painel Web Autônomo</p>
+        </div>
+      </div>
+
+      <!-- NAV MENUS (NEON) -->
+      <nav class="p-4 space-y-3">
+        <button id="btn-menu-consulta" onclick="switchTab('consulta')" class="nav-btn active" style="--neon-rgb:34,211,238;">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <span>CONSULTA</span>
+        </button>
+
+        <button id="btn-menu-atualizacao" onclick="switchTab('atualizacao')" class="nav-btn" style="--neon-rgb:232,121,249;">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>ATUALIZAÇÃO</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- CONFIGURAÇÕES DE REQUISIÇÃO & STATUS -->
+    <div class="p-4 text-xs t-muted space-y-3" style="border-top:1px solid var(--border)">
+
+      <!-- BOTÃO MODO CLARO / ESCURO -->
+      <button onclick="toggleTheme()" class="nav-btn nav-small" style="--neon-rgb:251,191,36;">
+        <i id="theme-icon" class="fa-solid fa-moon"></i>
+        <span id="theme-text">Modo Escuro</span>
+      </button>
+
+      <!-- SAIR -->
+      <button onclick="logout()" class="nav-btn nav-small" style="--neon-rgb:251,113,133;">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>SAIR</span>
+      </button>
+
+      <div class="flex items-center justify-between pt-2">
+        <span class="flex items-center space-x-2">
+          <span id="api-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse" style="box-shadow:0 0 8px #fbbf24"></span>
+          <span id="api-text">Conectando...</span>
+        </span>
+        <button onclick="loadRealData()" title="Recarregar Planilha" class="hover:text-indigo-400 transition">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ÁREA PRINCIPAL DO PAINEL -->
+  <main class="flex-1 flex flex-col h-full overflow-hidden">
+
+    <!-- CABEÇALHO -->
+    <header class="app-header h-16 px-8 flex items-center justify-between shrink-0">
+      <div class="flex items-center flex-1 min-w-0 mr-6">
+        <h2 class="marquee" aria-label="Título da página">
+          <div class="marquee-track">
+            <span id="page-title" class="marquee-item">Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!</span>
+            <span class="marquee-item" aria-hidden="true">Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!</span>
+          </div>
+        </h2>
+      </div>
+      <div class="flex items-center space-x-5 shrink-0">
+        <div id="loading-indicator" class="hidden flex items-center space-x-2 t-accent text-xs font-semibold">
+          <i class="fa-solid fa-circle-notch fa-spin"></i>
+          <span>Sincronizando com Planilha...</span>
+        </div>
+        <span class="user-chip"><i class="fa-solid fa-user-shield"></i><span id="user-chip-name">@teste</span></span>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-auto p-8 relative">
+
+      <!-- ================= TELA 1: CONSULTA ================= -->
+      <section id="view-consulta" class="space-y-6">
+
+        <!-- CARDS DE RESUMO METÁLICOS -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4" id="dashboard-cards">
+          <!-- Gerados dinamicamente no JS -->
+        </div>
+
+        <!-- FILTROS -->
+        <div class="panel p-5 flex flex-wrap items-end gap-4">
+          <div>
+            <label class="lbl">Data Inicial</label>
+            <input type="date" id="filter-date-start" onchange="renderConsultaTable()" class="field">
+          </div>
+
+          <div>
+            <label class="lbl">Data Final</label>
+            <input type="date" id="filter-date-end" onchange="renderConsultaTable()" class="field">
+          </div>
+
+          <div>
+            <label class="lbl">Status Automático</label>
+            <select id="filter-status-auto" onchange="renderConsultaTable()" class="field" style="width:11rem">
+              <option value="TODOS">Todos os Status</option>
+              <option value="PENDENTE">PENDENTE</option>
+              <option value="ENVIADO">ENVIADO</option>
+              <option value="IMPRESSO">IMPRESSO</option>
+              <option value="RETORNO">RETORNO</option>
+              <option value="TRANSFERIR">TRANSFERIR</option>
+              <option value="RESOLVIDO">RESOLVIDO</option>
+            </select>
+          </div>
+
+          <button onclick="clearFilters()" class="btn">
+            <i class="fa-solid fa-filter-circle-xmark"></i>
+            Limpar Filtros
+          </button>
+
+          <div class="ml-auto">
+            <button onclick="openTop5Modal()" class="neon-btn" style="--neon-rgb:129,140,248;">
+              <i class="fa-solid fa-chart-line"></i>
+              <span>Análise TOP 5</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- TABELA DE DADOS -->
+        <div class="panel overflow-hidden">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Filial</th>
+                  <th>Nº Carga</th>
+                  <th>Nº NF</th>
+                  <th>Cód. Cliente</th>
+                  <th>Razão Social</th>
+                  <th>Motorista</th>
+                  <th>Município/Bairro</th>
+                  <th>Rota Principal</th>
+                  <th>Status Manual</th>
+                  <th>Status Auto</th>
+                  <th>Observação</th>
+                </tr>
+              </thead>
+              <tbody id="table-body" class="font-mono">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TELA 2: ATUALIZAÇÃO ================= -->
+      <section id="view-atualizacao" class="hidden max-w-4xl mx-auto space-y-6">
+
+        <div class="panel p-6 space-y-4">
+          <h3 class="sec-title">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>1. Seleção do Período de Trabalho</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="lbl">Data Inicial</label>
+              <input type="date" id="upd-period-start" onchange="checkNfInPeriod()" class="field" style="padding:.7rem .9rem">
+            </div>
+            <div>
+              <label class="lbl">Data Final</label>
+              <input type="date" id="upd-period-end" onchange="checkNfInPeriod()" class="field" style="padding:.7rem .9rem">
+            </div>
+          </div>
+          <div class="divider pt-3 flex items-center justify-between">
+            <span class="text-xs t-muted">Atualizar todas as ocorrências do período para "ENVIADO":</span>
+            <button onclick="executeBulkUpdate()" class="neon-btn" style="--neon-rgb:59,130,246;">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>Atualizar p/ "ENVIADO"</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel p-6 space-y-6">
+          <h3 class="sec-title">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>2. Consulta & Alteração de Nota Fiscal</span>
+          </h3>
+
+          <div>
+            <label class="lbl">Número da Nota Fiscal (Nº NF)</label>
+            <input type="text" id="upd-nf-input" oninput="checkNfInPeriod()" placeholder="Digite o número da Nota Fiscal..."
+              class="field font-mono" style="padding:.8rem 1rem; font-size:1rem">
+          </div>
+
+          <div id="nf-status-badge" class="hidden alert"></div>
+
+          <div id="nf-details-card" class="hidden inset p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div><span class="t-muted block">Data:</span><span id="det-data" class="font-mono font-semibold"></span></div>
+            <div><span class="t-muted block">Cliente:</span><span id="det-cliente" class="font-semibold truncate block"></span></div>
+            <div><span class="t-muted block">Filial:</span><span id="det-filial" class="font-semibold"></span></div>
+            <div><span class="t-muted block">Motorista:</span><span id="det-motorista" class="font-semibold"></span></div>
+          </div>
+
+          <div>
+            <label class="lbl">Novo Status Manual (Coluna J)</label>
+            <select id="upd-status-select" onchange="onStatusSelectChange()" class="field" style="padding:.8rem 1rem">
+              <option value="">-- Selecione o Status --</option>
+              <option value="PENDENTE">PENDENTE</option>
+              <option value="ENVIADO">ENVIADO</option>
+              <option value="IMPRESSO">IMPRESSO</option>
+              <option value="RETORNO">RETORNO</option>
+              <option value="TRANSFERIR">TRANSFERIR</option>
+              <option value="RESOLVIDO">RESOLVIDO</option>
+            </select>
+          </div>
+
+          <div id="obs-container" class="space-y-1">
+            <div class="flex items-center justify-between">
+              <label class="lbl" style="margin-bottom:0">Observação (Coluna L)</label>
+              <span id="obs-required-label" class="hidden alert alert-error" style="padding:.15rem .5rem; font-size:10px; text-transform:uppercase; font-weight:800">Obrigatório</span>
+            </div>
+            <textarea id="upd-obs-input" rows="3" placeholder="Digite a observação..." class="field" style="padding:.75rem"></textarea>
+          </div>
+
+          <button id="btn-save" onclick="saveNfUpdate()" class="btn-primary sheen">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span id="btn-save-label">GRAVAR NA PLANILHA</span>
+          </button>
+          <p id="save-note" class="text-center text-[10px] t-muted mt-2"></p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MODAL TOP 5 CLIENTES COM GRÁFICO E TABELA -->
+  <div id="top5-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(10,15,30,.55); backdrop-filter: blur(6px);">
+    <div class="panel max-w-2xl w-full p-6 space-y-5">
+
+      <div class="flex items-center justify-between pb-4" style="border-bottom:1px solid var(--border)">
+        <div class="flex items-center space-x-3">
+          <div class="brand-icon" style="width:2.5rem;height:2.5rem;border-radius:.75rem;--x:0">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-lg">Análise: Top 5 Clientes</h3>
+            <p class="text-xs t-muted">Ocorrências baseadas nos filtros atuais</p>
+          </div>
+        </div>
+
+        <!-- Toggle Tabela / Gráfico -->
+        <div class="seg">
+          <button id="btn-view-chart" onclick="toggleTop5View('chart')" class="seg-btn active">
+            <i class="fa-solid fa-chart-column mr-1"></i> Gráfico
+          </button>
+          <button id="btn-view-table" onclick="toggleTop5View('table')" class="seg-btn">
+            <i class="fa-solid fa-list mr-1"></i> Tabela
+          </button>
+        </div>
+      </div>
+
+      <!-- Container do Gráfico -->
+      <div id="top5-chart-container" class="relative w-full h-64 flex items-center justify-center">
+        <canvas id="top5Canvas"></canvas>
+      </div>
+
+      <!-- Container da Lista -->
+      <div id="top5-list-container" class="hidden space-y-3 max-h-64 overflow-y-auto pr-2"></div>
+
+      <div class="pt-4 text-right" style="border-top:1px solid var(--border)">
+        <button onclick="closeTop5Modal()" class="btn">
+          <i class="fa-solid fa-xmark"></i> Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * CONFIGURAÇÕES DA API GOOGLE SHEETS
+     */
+    const API_KEY = "AIzaSyBwvNC2bf6Ix8atG07BhzcvxhlnhyiPgv4";
+    const SHEET_ID = "1o4_kUnBmgnbYFbsf6Zv2_0m_iUpPHNT6Vk3xNCEc0xE";
+    const RANGE = "Controle de Canhotos!A2:L";
+
+    /**
+     * GRAVAÇÃO NA PLANILHA
+     * Cole aqui a URL do Web App (Apps Script, implantado como "Qualquer pessoa")
+     * que contém as funções doPost/atualizarLinhas.
+     * Se este painel for aberto DENTRO do Apps Script (google.script.run), a gravação
+     * funciona automaticamente. Sem nenhum dos dois, as alterações ficam só na tela.
+     */
+    const WEB_APP_URL = "";
+
+    /**
+     * CREDENCIAIS DE ACESSO (tela de login)
+     */
+    const LOGIN_USER = "@teste";
+    const LOGIN_PASS = "147852";
+    const AUTH_KEY = "canhotos_auth";
+
+    let rawData = [];
+    let currentNfMatch = null;
+    let top5ChartInstance = null;
+    let toastTimer = null;
+
+    // Ícones dos cards (cores/efeito metálico ficam no CSS: .m-STATUS)
+    const statusIcons = {
+      PENDENTE: 'fa-hourglass-half',
+      ENVIADO: 'fa-paper-plane',
+      IMPRESSO: 'fa-print',
+      RETORNO: 'fa-rotate-left',
+      TRANSFERIR: 'fa-right-left',
+      RESOLVIDO: 'fa-circle-check'
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Checa tema salvo
+      if (localStorage.getItem('theme') === 'light') {
+        document.documentElement.classList.remove('dark');
+        updateThemeUI('light');
+      } else {
+        updateThemeUI('dark');
+      }
+
+      updateBackendUI();
+      fitMarquee();
+      window.addEventListener('resize', fitMarquee);
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeTop5Modal(); });
+
+      // Enter no campo de usuário apenas avança para a senha (não tenta logar, não mostra erro)
+      document.getElementById('login-user').addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          document.getElementById('login-pass').focus();
+        }
+      });
+
+      // Checa sessão de login
+      if (isAuthenticated()) {
+        document.getElementById('login-screen').classList.add('hidden');
+        loadRealData();
+      } else {
+        setTimeout(() => document.getElementById('login-user').focus(), 100);
+      }
+    });
+
+    /**
+     * LOGIN / LOGOUT
+     */
+    function isAuthenticated() {
+      try { return sessionStorage.getItem(AUTH_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const user = document.getElementById('login-user').value.trim().toLowerCase();
+      const pass = document.getElementById('login-pass').value;
+      const errBox = document.getElementById('login-error');
+      const card = document.getElementById('login-card');
+
+      if (user === LOGIN_USER.toLowerCase() && pass === LOGIN_PASS) {
+        errBox.classList.add('hidden');
+        try { sessionStorage.setItem(AUTH_KEY, '1'); } catch (err) {}
+        const screen = document.getElementById('login-screen');
+        screen.classList.add('closing');
+        setTimeout(() => screen.classList.add('hidden'), 450);
+        document.getElementById('login-pass').value = '';
+        loadRealData();
+      } else {
+        errBox.classList.remove('hidden');
+        card.classList.remove('shake');
+        void card.offsetWidth; // reinicia a animação
+        card.classList.add('shake');
+        document.getElementById('login-pass').select();
+      }
+    }
+
+    function logout() {
+      try { sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
+      const screen = document.getElementById('login-screen');
+      document.getElementById('login-user').value = '';
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-error').classList.add('hidden');
+      closeTop5Modal();
+      screen.classList.remove('hidden');
+      void screen.offsetWidth;
+      screen.classList.remove('closing');
+      setTimeout(() => document.getElementById('login-user').focus(), 100);
+    }
+
+    function togglePassword() {
+      const input = document.getElementById('login-pass');
+      const icon = document.getElementById('eye-icon');
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      icon.className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    }
+
+    /**
+     * Alternar MODO CLARO / ESCURO
+     */
+    function toggleTheme() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+        updateThemeUI('light');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+        updateThemeUI('dark');
+      }
+      // Atualiza o gráfico se estiver aberto
+      if (top5ChartInstance) openTop5Modal(false);
+    }
+
+    function updateThemeUI(mode) {
+      const icon = document.getElementById('theme-icon');
+      const iconLogin = document.getElementById('theme-icon-login');
+      const text = document.getElementById('theme-text');
+      if (mode === 'dark') {
+        icon.className = 'fa-solid fa-sun';
+        iconLogin.className = 'fa-solid fa-sun text-amber-400';
+        text.innerText = 'Modo Claro';
+      } else {
+        icon.className = 'fa-solid fa-moon';
+        iconLogin.className = 'fa-solid fa-moon text-indigo-500';
+        text.innerText = 'Modo Escuro';
+      }
+    }
+
+    /**
+     * BUSCAR DADOS REAIS VIA API DO GOOGLE SHEETS
+     */
+    function setApiStatus(state) {
+      const dot = document.getElementById('api-dot');
+      const txt = document.getElementById('api-text');
+      const map = {
+        loading: ['bg-amber-400 animate-pulse', '#fbbf24', 'Sincronizando...'],
+        ok:      ['bg-emerald-400 animate-pulse', '#34d399', 'API Conectada'],
+        error:   ['bg-rose-500', '#fb7185', 'Falha na conexão']
+      };
+      const m = map[state];
+      dot.className = 'w-2 h-2 rounded-full ' + m[0];
+      dot.style.boxShadow = '0 0 8px ' + m[1];
+      txt.textContent = m[2];
+    }
+
+    async function loadRealData() {
+      showLoading(true);
+      setApiStatus('loading');
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE)}?key=${API_KEY}`;
+
+      try {
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.error) throw new Error(result.error.message);
+
+        if (result.values) {
+          updatePendingSummary(result.values);
+          const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO"];
+          rawData = result.values.map((row, index) => {
+            return {
+              rowIndex: index + 2,
+              data: row[0] || '',
+              filial: row[1] || '',
+              numCarga: row[2] || '',
+              numNf: String(row[3] || '').trim(),
+              codCliente: row[4] || '',
+              razaoSocial: row[5] || '',
+              nomeMotorista: row[6] || '',
+              municipioBairro: row[7] || '',
+              rotaPrincipal: row[8] || '',
+              statusManual: row[9] || '',
+              statusAuto: String(row[10] || '').trim().toUpperCase(),
+              observacao: row[11] || ''
+            };
+          }).filter(item => allowedStatus.includes(item.statusAuto));
+
+          renderConsultaTable();
+          showToast('Dados da Planilha Sincronizados!', 'success');
+        } else {
+          rawData = [];
+          updatePendingSummary([]);
+          renderConsultaTable();
+        }
+        setApiStatus('ok');
+      } catch (err) {
+        setApiStatus('error');
+        showToast('Erro de API: ' + err.message, 'error');
+      }
+      showLoading(false);
+    }
+
+    function showLoading(state) {
+      const ind = document.getElementById('loading-indicator');
+      if (state) ind.classList.remove('hidden');
+      else ind.classList.add('hidden');
+    }
+
+    // Título atual do letreiro e resumo de pendências (exibido antes do título)
+    let currentTitleText = "Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!";
+    let pendingSummaryHtml = '';
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Atualiza o título do letreiro (todas as cópias do texto).
+    // Sem argumento, apenas redesenha com o título atual + resumo de pendências.
+    function setPageTitle(text) {
+      if (typeof text === 'string') currentTitleText = text;
+      const html = (pendingSummaryHtml ? pendingSummaryHtml + '<span class="mq-sep">.</span>' : '') + escapeHtml(currentTitleText);
+      document.querySelectorAll('.marquee-item').forEach(el => { el.innerHTML = html; });
+      fitMarquee();
+    }
+
+    // Converte a data da coluna A (DD/MM/AAAA ou AAAA-MM-DD) em timestamp UTC à meia-noite
+    function parseSheetDate(str) {
+      const s = String(str || '').trim();
+      let d, m, y;
+      let mt = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+      if (mt) { d = +mt[1]; m = +mt[2]; y = +mt[3]; if (y < 100) y += 2000; }
+      else {
+        mt = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (!mt) return null;
+        y = +mt[1]; m = +mt[2]; d = +mt[3];
+      }
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+      return Date.UTC(y, m - 1, d);
+    }
+
+    /**
+     * RESUMO DE PENDÊNCIAS (letreiro)
+     * Critério: todas as linhas da planilha cujo status (coluna K) seja diferente de RESOLVIDO.
+     * Datas vêm da coluna A. Não depende dos filtros da tela.
+     */
+    function updatePendingSummary(values) {
+      const now = new Date();
+      const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+      let pending = 0, over7 = 0, oldestTs = null, oldestCount = 0;
+
+      values.forEach(row => {
+        const st = String(row[10] || '').trim().toUpperCase();   // coluna K
+        if (!st || st === 'RESOLVIDO') return;
+        pending++;
+
+        const ts = parseSheetDate(row[0]);                       // coluna A
+        if (ts === null) return;
+        const days = Math.round((todayUTC - ts) / 86400000);
+        if (days > 7) over7++;
+        if (oldestTs === null || ts < oldestTs) { oldestTs = ts; oldestCount = 1; }
+        else if (ts === oldestTs) oldestCount++;
+      });
+
+      if (pending === 0) {
+        pendingSummaryHtml = '<i class="fa-solid fa-circle-check mq-ok"></i> <span class="mq-ok">Nenhuma nota pendente de assinatura!</span>';
+      } else {
+        const parts = [];
+        parts.push(`Notas pendentes de assinatura: <strong class="mq-warn">${pending}</strong>`);
+
+        if (oldestTs !== null) {
+          const oldDays = Math.max(0, Math.round((todayUTC - oldestTs) / 86400000));
+          const dayTxt = oldDays === 0 ? 'hoje' : (oldDays === 1 ? '1 dia' : oldDays + ' dias');
+          const qtyTxt = oldestCount > 1 ? ` (${oldestCount} notas com essa data)` : '';
+          parts.push(`Nota mais antiga: <strong class="mq-warn">${dayTxt}</strong>${qtyTxt}`);
+        }
+
+        parts.push(`Notas com mais de 7 dias: <strong class="mq-danger">${over7}</strong>`);
+        pendingSummaryHtml = '<i class="fa-solid fa-triangle-exclamation mq-warn"></i> '
+          + parts.join('<span class="mq-sep">•</span>');
+      }
+      setPageTitle();
+    }
+
+    // Mantém a velocidade do letreiro constante (~55px/s) em qualquer largura de tela
+    function fitMarquee() {
+      const track = document.querySelector('.marquee-track');
+      if (!track) return;
+      const unit = track.scrollWidth / 2;
+      if (unit > 0) track.style.animationDuration = Math.max(12, unit / 55) + 's';
+    }
+
+    // ALTERNAR ABAS
+    function switchTab(tab) {
+      const btnConsulta = document.getElementById('btn-menu-consulta');
+      const btnAtualizacao = document.getElementById('btn-menu-atualizacao');
+      const viewConsulta = document.getElementById('view-consulta');
+      const viewAtualizacao = document.getElementById('view-atualizacao');
+
+      if (tab === 'consulta') {
+        btnConsulta.classList.add('active');
+        btnAtualizacao.classList.remove('active');
+        viewConsulta.classList.remove('hidden');
+        viewAtualizacao.classList.add('hidden');
+        setPageTitle("Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!");
+      } else {
+        btnAtualizacao.classList.add('active');
+        btnConsulta.classList.remove('active');
+        viewAtualizacao.classList.remove('hidden');
+        viewConsulta.classList.add('hidden');
+        setPageTitle("Atualização de Status . Seja Bem-Vindo ao Painel de Controle de Canhotos!");
+      }
+    }
+
+    // FILTRAR DADOS
+    function getFilteredConsultaData() {
+      const startDate = document.getElementById('filter-date-start').value;
+      const endDate = document.getElementById('filter-date-end').value;
+      const statusAuto = document.getElementById('filter-status-auto').value;
+
+      return rawData.filter(item => {
+        // Conversão de data para comparar corretamente (YYYY-MM-DD)
+        let itemDateStr = item.data.split('/').reverse().join('-'); // Se vier como DD/MM/YYYY
+        if (item.data.includes('-')) itemDateStr = item.data; // Se já vier YYYY-MM-DD
+
+        if (startDate && itemDateStr < startDate) return false;
+        if (endDate && itemDateStr > endDate) return false;
+        if (statusAuto !== 'TODOS' && item.statusAuto !== statusAuto) return false;
+        return true;
+      });
+    }
+
+    // RENDERIZAR TABELA E CARDS
+    function renderConsultaTable() {
+      const data = getFilteredConsultaData();
+      const tbody = document.getElementById('table-body');
+
+      renderDashboardCards(data);
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" class="p-8 text-center t-muted italic">Nenhum registro encontrado.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(item => `
+        <tr>
+          <td>${item.data || '-'}</td>
+          <td>${item.filial}</td>
+          <td>${item.numCarga}</td>
+          <td class="font-bold t-accent">${item.numNf}</td>
+          <td>${item.codCliente}</td>
+          <td class="font-sans font-semibold">${item.razaoSocial}</td>
+          <td class="font-sans t-muted">${item.nomeMotorista}</td>
+          <td class="font-sans t-muted">${item.municipioBairro}</td>
+          <td class="font-sans t-muted">${item.rotaPrincipal}</td>
+          <td>${renderStatusBadge(item.statusManual)}</td>
+          <td>${renderStatusBadge(item.statusAuto)}</td>
+          <td class="font-sans t-muted max-w-xs truncate">${item.observacao || '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderDashboardCards(data) {
+      const counts = { TOTAL: data.length, PENDENTE: 0, ENVIADO: 0, IMPRESSO: 0, RETORNO: 0, TRANSFERIR: 0, RESOLVIDO: 0 };
+
+      data.forEach(item => {
+        if (counts[item.statusAuto] !== undefined) counts[item.statusAuto]++;
+      });
+
+      const container = document.getElementById('dashboard-cards');
+
+      // Card Total (aço)
+      let html = `
+        <div class="metal m-TOTAL">
+          <i class="fa-solid fa-layer-group metal-ico"></i>
+          <p class="metal-lbl">Total Geral</p>
+          <h4 class="metal-num">${counts.TOTAL}</h4>
+        </div>
+      `;
+
+      // Cards Status (cada um com sua cor metálica)
+      Object.keys(statusIcons).forEach(st => {
+        html += `
+          <div class="metal m-${st}">
+            <i class="fa-solid ${statusIcons[st]} metal-ico"></i>
+            <p class="metal-lbl">${st}</p>
+            <h4 class="metal-num">${counts[st]}</h4>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderStatusBadge(status) {
+      if (!status) return '<span class="t-muted">-</span>';
+      const st = status.toUpperCase();
+      const known = statusIcons[st] ? `st-${st}` : '';
+      return `<span class="badge ${known}">${st}</span>`;
+    }
+
+    function clearFilters() {
+      document.getElementById('filter-date-start').value = '';
+      document.getElementById('filter-date-end').value = '';
+      document.getElementById('filter-status-auto').value = 'TODOS';
+      renderConsultaTable();
+    }
+
+    /**
+     * LÓGICA DO MODAL TOP 5 COM GRÁFICO E LISTA
+     */
+    function openTop5Modal(showModal = true) {
+      const data = getFilteredConsultaData();
+      const counts = {};
+
+      data.forEach(item => {
+        const key = item.codCliente || 'N/D';
+        if (!counts[key]) counts[key] = { cod: key, razao: item.razaoSocial || 'Desconhecido', count: 0 };
+        counts[key].count++;
+      });
+
+      const sorted = Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 5);
+
+      // Renderizar Lista
+      const listContainer = document.getElementById('top5-list-container');
+      if (sorted.length === 0) {
+        listContainer.innerHTML = '<p class="text-center text-sm py-4 t-muted">Nenhum dado encontrado no período.</p>';
+      } else {
+        const maxCount = sorted[0].count;
+        listContainer.innerHTML = sorted.map((item, index) => {
+          const percent = Math.round((item.count / maxCount) * 100);
+          return `
+            <div class="inset p-3.5 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold">#${index + 1} - ${item.razao} <span class="font-mono t-accent">(${item.cod})</span></span>
+                <span class="badge st-ENVIADO font-mono">${item.count} ocorrências</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${percent}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Renderizar Gráfico
+      renderTop5Chart(sorted);
+
+      if (showModal) {
+        document.getElementById('top5-modal').classList.remove('hidden');
+        toggleTop5View('chart'); // Default view
+      }
+    }
+
+    function renderTop5Chart(sortedData) {
+      const ctx = document.getElementById('top5Canvas').getContext('2d');
+      if (top5ChartInstance) top5ChartInstance.destroy();
+
+      if (sortedData.length === 0) return;
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const textColor = isDark ? '#c4d0ea' : '#3b4a68';
+      const gridColor = isDark ? 'rgba(148,163,184,.18)' : 'rgba(70,90,140,.20)';
+
+      // Cores Neon
+      const bgColors = [
+        'rgba(99, 102, 241, 0.85)', // Indigo
+        'rgba(236, 72, 153, 0.85)', // Pink
+        'rgba(16, 185, 129, 0.85)', // Emerald
+        'rgba(245, 158, 11, 0.85)', // Amber
+        'rgba(6, 182, 212, 0.85)'   // Cyan
+      ];
+      const borderColors = [
+        '#818cf8', '#f472b6', '#34d399', '#fbbf24', '#22d3ee'
+      ];
+
+      top5ChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: sortedData.map(d => d.razao.substring(0, 15) + (d.razao.length > 15 ? '...' : '')),
+          datasets: [{
+            label: 'Ocorrências',
+            data: sortedData.map(d => d.count),
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 2,
+            borderRadius: 6,
+            barThickness: 30
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: isDark ? 'rgba(20, 27, 47, 0.95)' : 'rgba(235, 240, 249, 0.96)',
+              titleColor: isDark ? '#fff' : '#1b2640',
+              bodyColor: isDark ? '#c4d0ea' : '#3b4a68',
+              borderColor: isDark ? '#4a5a8a' : '#b3c1dc',
+              borderWidth: 1,
+              padding: 10,
+              boxPadding: 4
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { color: gridColor },
+              ticks: { color: textColor, precision: 0 }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: textColor, font: { size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
+    function toggleTop5View(view) {
+      const chartCont = document.getElementById('top5-chart-container');
+      const listCont = document.getElementById('top5-list-container');
+      const btnChart = document.getElementById('btn-view-chart');
+      const btnTable = document.getElementById('btn-view-table');
+
+      if (view === 'chart') {
+        chartCont.classList.remove('hidden');
+        listCont.classList.add('hidden');
+        btnChart.classList.add('active');
+        btnTable.classList.remove('active');
+      } else {
+        chartCont.classList.add('hidden');
+        listCont.classList.remove('hidden');
+        btnTable.classList.add('active');
+        btnChart.classList.remove('active');
+      }
+    }
+
+    function closeTop5Modal() {
+      document.getElementById('top5-modal').classList.add('hidden');
+    }
+
+    // LÓGICA DE ATUALIZAÇÃO (SIMULADA LOCALMENTE NESTE SCRIPT)
+    function checkNfInPeriod() {
+      const nfInput = document.getElementById('upd-nf-input').value.trim();
+      const pStart = document.getElementById('upd-period-start').value;
+      const pEnd = document.getElementById('upd-period-end').value;
+
+      const badge = document.getElementById('nf-status-badge');
+      const detailsCard = document.getElementById('nf-details-card');
+
+      if (!nfInput) {
+        badge.classList.add('hidden');
+        detailsCard.classList.add('hidden');
+        currentNfMatch = null;
+        return;
+      }
+
+      const match = rawData.find(item => item.numNf.toLowerCase() === nfInput.toLowerCase());
+      currentNfMatch = match;
+      badge.classList.remove('hidden');
+
+      if (!match) {
+        badge.className = "alert alert-error";
+        badge.innerHTML = `<i class="fa-solid fa-circle-xmark fa-lg"></i><span>NF <strong>${nfInput}</strong> não encontrada!</span>`;
+        detailsCard.classList.add('hidden');
+        return;
+      }
+
+      document.getElementById('det-data').innerText = match.data || '-';
+      document.getElementById('det-cliente').innerText = `${match.razaoSocial} (${match.codCliente})`;
+      document.getElementById('det-filial').innerText = match.filial || '-';
+      document.getElementById('det-motorista').innerText = match.nomeMotorista || '-';
+      detailsCard.classList.remove('hidden');
+
+      let inPeriod = true;
+      let itemDateStr = match.data.split('/').reverse().join('-');
+      if (match.data.includes('-')) itemDateStr = match.data;
+      if (pStart && itemDateStr < pStart) inPeriod = false;
+      if (pEnd && itemDateStr > pEnd) inPeriod = false;
+
+      if (inPeriod) {
+        badge.className = "alert alert-ok";
+        badge.innerHTML = `<i class="fa-solid fa-circle-check fa-lg"></i><span>NF encontrada no período selecionado.</span>`;
+      } else {
+        badge.className = "alert alert-warn";
+        badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation fa-lg"></i><span>NF encontrada, mas <strong>FORA</strong> do período selecionado!</span>`;
+      }
+    }
+
+    function onStatusSelectChange() {
+      const status = document.getElementById('upd-status-select').value;
+      const reqLabel = document.getElementById('obs-required-label');
+      const obsInput = document.getElementById('upd-obs-input');
+      if (status === 'RETORNO' || status === 'PENDENTE') {
+        reqLabel.classList.remove('hidden');
+        obsInput.classList.add('field-error');
+      } else {
+        reqLabel.classList.add('hidden');
+        obsInput.classList.remove('field-error');
+      }
+    }
+
+    /**
+     * PERSISTÊNCIA NA PLANILHA
+     * updates = [{ row, status, obs }]  (row = linha real na planilha; status -> coluna J; obs -> coluna L)
+     * Retorna o resultado do servidor, ou null quando não há backend configurado (modo só-tela).
+     */
+    function hasGoogleRun() {
+      return typeof google !== 'undefined' && google.script && google.script.run;
+    }
+
+    function hasBackend() {
+      return hasGoogleRun() || !!WEB_APP_URL;
+    }
+
+    async function persistUpdates(updates) {
+      if (hasGoogleRun()) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(r => (r && r.ok) ? resolve(r) : reject(new Error((r && r.error) || 'Falha ao gravar')))
+            .withFailureHandler(err => reject(new Error((err && err.message) || String(err))))
+            .atualizarLinhas(updates);
+        });
+      }
+      if (WEB_APP_URL) {
+        const resp = await fetch(WEB_APP_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'atualizarLinhas', updates })
+        });
+        const r = await resp.json();
+        if (!r.ok) throw new Error(r.error || 'Falha ao gravar');
+        return r;
+      }
+      return null;
+    }
+
+    function updateBackendUI() {
+      const label = document.getElementById('btn-save-label');
+      const note = document.getElementById('save-note');
+      if (hasBackend()) {
+        label.textContent = 'GRAVAR NA PLANILHA';
+        note.textContent = 'As alterações são gravadas diretamente nas colunas J (Status Manual) e L (Observação) da planilha.';
+      } else {
+        label.textContent = 'GRAVAR (SOMENTE NA TELA)';
+        note.textContent = '* Backend de gravação não configurado: as alterações valem apenas na tela atual. Informe a URL do Web App em WEB_APP_URL para gravar na planilha.';
+      }
+    }
+
+    function setSaving(state) {
+      const btn = document.getElementById('btn-save');
+      btn.disabled = state;
+      btn.style.opacity = state ? '.6' : '';
+      btn.style.pointerEvents = state ? 'none' : '';
+      if (state) document.getElementById('btn-save-label').textContent = 'GRAVANDO...';
+      else updateBackendUI();
+    }
+
+    async function saveNfUpdate() {
+      if (!currentNfMatch) return showToast('NF não encontrada na planilha.', 'error');
+
+      const status = document.getElementById('upd-status-select').value;
+      const obs = document.getElementById('upd-obs-input').value.trim();
+
+      if (!status) return showToast('Selecione o novo Status.', 'error');
+      if ((status === 'RETORNO' || status === 'PENDENTE') && !obs) return showToast('Observação OBRIGATÓRIA para este status.', 'error');
+
+      const item = currentNfMatch;
+      setSaving(true);
+      try {
+        const res = await persistUpdates([{ row: item.rowIndex, status: status, obs: obs }]);
+
+        // Reflete na tabela
+        item.statusManual = status;
+        item.observacao = obs;
+        renderConsultaTable();
+
+        if (res) showToast(`NF ${item.numNf} gravada na planilha!`, 'success');
+        else showToast(`NF ${item.numNf} atualizada apenas na tela (backend não configurado).`, 'warn');
+
+        document.getElementById('upd-nf-input').value = '';
+        document.getElementById('upd-status-select').value = '';
+        document.getElementById('upd-obs-input').value = '';
+        onStatusSelectChange();
+        checkNfInPeriod();
+      } catch (err) {
+        showToast('Erro ao gravar: ' + err.message, 'error');
+      }
+      setSaving(false);
+    }
+
+    async function executeBulkUpdate() {
+      const pStart = document.getElementById('upd-period-start').value;
+      const pEnd = document.getElementById('upd-period-end').value;
+
+      if (!pStart || !pEnd) return showToast('Informe a Data Inicial e a Data Final do período.', 'error');
+      if (pStart > pEnd) return showToast('A Data Inicial não pode ser maior que a Data Final.', 'error');
+
+      const targets = rawData.filter(item => {
+        let itemDateStr = item.data.split('/').reverse().join('-');
+        if (item.data.includes('-')) itemDateStr = item.data;
+        return itemDateStr >= pStart && itemDateStr <= pEnd;
+      });
+
+      if (targets.length === 0) return showToast('Nenhum registro encontrado no período.', 'error');
+      if (!confirm(`Atualizar ${targets.length} ocorrência(s) do período para ENVIADO?`)) return;
+
+      showLoading(true);
+      try {
+        // Envia em lotes para não estourar o tamanho da requisição
+        const BATCH = 200;
+        let saved = false;
+        for (let i = 0; i < targets.length; i += BATCH) {
+          const chunk = targets.slice(i, i + BATCH).map(it => ({ row: it.rowIndex, status: 'ENVIADO' }));
+          const res = await persistUpdates(chunk);
+          if (res) saved = true;
+        }
+        targets.forEach(it => { it.statusManual = 'ENVIADO'; });
+        renderConsultaTable();
+
+        if (saved) showToast(`${targets.length} registros gravados na planilha!`, 'success');
+        else showToast(`${targets.length} registros atualizados apenas na tela (backend não configurado).`, 'warn');
+      } catch (err) {
+        showToast('Erro ao gravar: ' + err.message, 'error');
+      }
+      showLoading(false);
+    }
+
+    // TOAST
+    function showToast(msg, type) {
+      const toast = document.getElementById('toast');
+      const icon = type === 'success' ? 'fa-circle-check' : (type === 'warn' ? 'fa-triangle-exclamation' : 'fa-circle-exclamation');
+      toast.className = 'toast toast-' + (['success', 'warn'].includes(type) ? type : 'error');
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i><span></span>`;
+      toast.querySelector('span').textContent = msg;
+      void toast.offsetWidth;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+  </script>
+</body>
+</html>
