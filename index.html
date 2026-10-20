@@ -1,4 +1,75 @@
 <!DOCTYPE html>
+<!--
+=====================================================================
+  COMO HABILITAR A GRAVAÇÃO NA PLANILHA (feito uma única vez)
+=====================================================================
+  A API Key só permite LER a planilha. Para GRAVAR, use um Web App do
+  Google Apps Script:
+
+  1) Abra a planilha > Extensões > Apps Script e cole o código abaixo.
+  2) Implantar > Nova implantação > tipo "App da Web"
+       Executar como: Eu  |  Quem pode acessar: Qualquer pessoa
+  3) Autorize, copie a URL (termina em /exec) e cole em WEB_APP_URL
+     (constante no <script> deste arquivo).
+  4) Se alterar o script depois, use Implantar > Gerenciar implantações >
+     Editar > Nova versão (a URL continua a mesma).
+
+  ---------------------- Code.gs ----------------------
+  const SHEET_ID   = '1o4_kUnBmgnbYFbsf6Zv2_0m_iUpPHNT6Vk3xNCEc0xE';
+  const ABA        = 'Controle de Canhotos';
+  const COL_STATUS = 10; // J - Status Manual
+  const COL_OBS    = 12; // L - Observação
+  const PERMITIDOS = ['PENDENTE','ENVIADO','IMPRESSO','RETORNO','TRANSFERIR','RESOLVIDO'];
+
+  function doGet() { return saida_({ ok: true, msg: 'Web App ativo' }); }
+
+  function doPost(e) {
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(20000);
+      const body = JSON.parse(e.postData.contents);
+      if (body.action !== 'atualizarLinhas') throw new Error('Ação inválida');
+      return saida_(atualizarLinhas(body.updates || []));
+    } catch (err) {
+      return saida_({ ok: false, error: String(err.message || err) });
+    } finally {
+      try { lock.releaseLock(); } catch (x) {}
+    }
+  }
+
+  function atualizarLinhas(updates) {
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(ABA);
+    if (!sh) throw new Error('Aba não encontrada: ' + ABA);
+    const last = sh.getLastRow();
+    if (last < 2) return { ok: true, updated: 0 };
+    const n = last - 1;
+    const rngJ = sh.getRange(2, COL_STATUS, n, 1);
+    const rngL = sh.getRange(2, COL_OBS, n, 1);
+    const J = rngJ.getValues();
+    const L = rngL.getValues();
+    let count = 0, mexeuL = false;
+    updates.forEach(function (u) {
+      const i = Number(u.row) - 2;
+      const st = String(u.status || '').toUpperCase();
+      if (!(i >= 0 && i < n) || PERMITIDOS.indexOf(st) < 0) return;
+      J[i][0] = st;
+      if (u.obs !== undefined) { L[i][0] = u.obs; mexeuL = true; }
+      count++;
+    });
+    rngJ.setValues(J);
+    if (mexeuL) rngL.setValues(L);
+    SpreadsheetApp.flush();
+    return { ok: true, updated: count };
+  }
+
+  function saida_(obj) {
+    return ContentService.createTextOutput(JSON.stringify(obj))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  -----------------------------------------------------
+  Obs.: as colunas J e L devem conter valores digitados (não fórmulas).
+=====================================================================
+-->
 <html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
@@ -330,17 +401,20 @@
       -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 88%, transparent 100%);
               mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 88%, transparent 100%);
     }
-    .marquee-track { 
-      display: flex; 
-      width: max-content; 
-      will-change: transform; 
+    .marquee-track {
+      display: flex;
+      width: max-content;
+      will-change: transform;
+      backface-visibility: hidden;
+      transform: translate3d(0, 0, 0);
     }
     .marquee:hover .marquee-track { animation-play-state: paused; }
     .marquee-item { flex: none; white-space: nowrap; text-align: right; }
     
-    @keyframes marqueeSingleMessage { 
-      0% { transform: translateX(100%); } 
-      100% { transform: translateX(-100%); } 
+    /* Entra pela borda direita e sai pela esquerda (valores em px calculados no JS) */
+    @keyframes marqueeSingleMessage {
+      0%   { transform: translate3d(var(--mq-from, 100%), 0, 0); }
+      100% { transform: translate3d(var(--mq-to, -100%), 0, 0); }
     }
     
     .mq-warn   { color: #b45309; }
@@ -747,7 +821,8 @@
     const API_KEY = "AIzaSyBwvNC2bf6Ix8atG07BhzcvxhlnhyiPgv4";
     const SHEET_ID = "1o4_kUnBmgnbYFbsf6Zv2_0m_iUpPHNT6Vk3xNCEc0xE";
     const RANGE = "Controle de Canhotos!A2:L";
-    const WEB_APP_URL = ""; 
+    // Cole aqui a URL do Web App (termina em /exec). Veja o passo a passo no início deste arquivo.
+    const WEB_APP_URL = "";
 
     const LOGIN_USER = "@teste";
     const LOGIN_PASS = "147852";
@@ -888,7 +963,7 @@
       txt.textContent = m[2];
     }
 
-    async function loadRealData() {
+    async function loadRealData(silent = false) {
       showLoading(true);
       setApiStatus('loading');
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE)}?key=${API_KEY}`;
@@ -923,7 +998,7 @@
           });
 
           renderConsultaTable();
-          showToast('Dados da Planilha Sincronizados!', 'success');
+          if (!silent) showToast('Dados da Planilha Sincronizados!', 'success');
         } else {
           rawData = [];
           updatePendingSummary([]);
@@ -1008,22 +1083,26 @@
       startMarqueeAnimation();
     }
 
+    // Velocidade do letreiro em pixels por segundo (menor = mais lento)
+    const MARQUEE_SPEED = 85;
+
     function startMarqueeAnimation() {
       if (marqueeMessages.length === 0) return;
       const titleEl = document.getElementById('page-title');
       const trackEl = document.getElementById('marquee-track');
-      
+      const boxW = trackEl.parentElement.clientWidth;
+
       titleEl.innerHTML = marqueeMessages[currentMarqueeIndex];
-      
-      // Reinicia a animação para a nova mensagem individual
+
+      // Reinicia a animação para a nova mensagem
       trackEl.style.animation = 'none';
-      void trackEl.offsetWidth; // Força reflow
-      
-      // Calcula o tempo proporcional ao tamanho da mensagem
-      const textLength = titleEl.textContent.length;
-      const duration = Math.max(7, Math.min(14, textLength * 0.18));
-      
-      trackEl.style.animation = `marqueeSingleMessage ${duration}s linear 1`;
+      const textW = trackEl.offsetWidth; // força reflow e mede a largura real do texto
+
+      // Velocidade constante (px/s): percurso = largura da caixa + largura do texto
+      const duration = (boxW + textW) / MARQUEE_SPEED;
+      trackEl.style.setProperty('--mq-from', boxW + 'px');
+      trackEl.style.setProperty('--mq-to', (-textW) + 'px');
+      trackEl.style.animation = `marqueeSingleMessage ${duration.toFixed(2)}s linear 1 forwards`;
     }
 
     function stepMarqueeMessage() {
@@ -1407,15 +1486,23 @@
         });
       }
       if (WEB_APP_URL) {
-        const resp = await fetch(WEB_APP_URL, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'atualizarLinhas', updates })
-        });
-        const r = await resp.json();
-        if (!r.ok) throw new Error(r.error || 'Falha ao gravar');
+        let r;
+        try {
+          // text/plain evita o "preflight" de CORS, que o Apps Script não responde
+          const resp = await fetch(WEB_APP_URL, {
+            method: 'POST',
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'atualizarLinhas', updates })
+          });
+          r = await resp.json();
+        } catch (e) {
+          throw new Error('Sem resposta do Web App. Confira a URL e se a implantação está com acesso "Qualquer pessoa".');
+        }
+        if (!r || !r.ok) throw new Error((r && r.error) || 'Falha ao gravar');
         return r;
       }
-      return null;
+      throw new Error('Gravação na planilha não configurada: preencha a constante WEB_APP_URL.');
     }
 
     function setSaving(state) {
@@ -1437,21 +1524,20 @@
       const item = currentNfMatch;
       setSaving(true);
       try {
-        const res = await persistUpdates([{ row: item.rowIndex, status: status, obs: obs, colStatus: 'J' }]);
+        await persistUpdates([{ row: item.rowIndex, status: status, obs: obs, colStatus: 'J' }]);
 
         item.statusManual = status;
         item.observacao = obs;
-        
-        renderConsultaTable();
-
-        if (res) showToast(`NF ${item.numNf} gravada na planilha!`, 'success');
-        else showToast(`NF ${item.numNf} atualizada apenas na tela.`, 'warn');
 
         document.getElementById('upd-nf-input').value = '';
         document.getElementById('upd-status-select').value = '';
         document.getElementById('upd-obs-input').value = '';
         onStatusSelectChange();
         checkNfInPeriod();
+
+        // Relê a planilha: atualiza tabela, cards, Status Auto (coluna K) e letreiro
+        await loadRealData(true);
+        showToast(`NF ${item.numNf} gravada na planilha!`, 'success');
       } catch (err) {
         showToast('Erro ao gravar: ' + err.message, 'error');
       }
@@ -1477,18 +1563,16 @@
       showLoading(true);
       try {
         const BATCH = 200;
-        let saved = false;
         for (let i = 0; i < targets.length; i += BATCH) {
           const chunk = targets.slice(i, i + BATCH).map(it => ({ row: it.rowIndex, status: 'ENVIADO', colStatus: 'J' }));
-          const res = await persistUpdates(chunk);
-          if (res) saved = true;
+          await persistUpdates(chunk);
         }
-        
-        targets.forEach(it => { it.statusManual = 'ENVIADO'; });
-        renderConsultaTable();
 
-        if (saved) showToast(`${targets.length} registros gravados na planilha!`, 'success');
-        else showToast(`${targets.length} registros atualizados apenas na tela.`, 'warn');
+        targets.forEach(it => { it.statusManual = 'ENVIADO'; });
+
+        // Relê a planilha para refletir exatamente o que foi gravado
+        await loadRealData(true);
+        showToast(`${targets.length} registros gravados na planilha!`, 'success');
       } catch (err) {
         showToast('Erro ao gravar: ' + err.message, 'error');
       }
