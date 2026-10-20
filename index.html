@@ -29,7 +29,7 @@
 
   <style>
     /* =========================================================
-       TEMAS — equilibrados (nem branco puro, nem preto puro)
+       TEMAS — equilibrados
        ========================================================= */
     :root {
       color-scheme: light;
@@ -322,20 +322,26 @@
     .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #6366f1, #22d3ee); box-shadow: 0 0 10px rgba(99,102,241,.7); }
 
     /* =========================================================
-       LETREIRO (CÍCLICO)
+       LETREIRO (TRANSIÇÃO PRECISA MENSAGEM A MENSAGEM)
        ========================================================= */
     .marquee {
-      container-type: inline-size;
       position: relative; overflow: hidden; width: 100%; min-width: 0;
       font-size: 1.125rem; font-weight: 800; letter-spacing: -.01em;
       -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 88%, transparent 100%);
               mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 88%, transparent 100%);
     }
-    .marquee-track { display: flex; width: max-content; animation: marqueeMove 12s linear infinite; will-change: transform; }
+    .marquee-track { 
+      display: flex; 
+      width: max-content; 
+      will-change: transform; 
+    }
     .marquee:hover .marquee-track { animation-play-state: paused; }
-    .marquee-item { flex: none; min-width: 900px; min-width: 100cqw; text-align: right; white-space: nowrap; }
-    @keyframes marqueeMove { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-    @media (prefers-reduced-motion: reduce) { .marquee-track { animation: none; } }
+    .marquee-item { flex: none; white-space: nowrap; text-align: right; }
+    
+    @keyframes marqueeSingleMessage { 
+      0% { transform: translateX(100%); } 
+      100% { transform: translateX(-100%); } 
+    }
     
     .mq-warn   { color: #b45309; }
     .mq-danger { color: #be123c; }
@@ -549,7 +555,6 @@
         <h2 class="marquee" aria-label="Título da página">
           <div class="marquee-track" id="marquee-track">
             <span id="page-title" class="marquee-item"></span>
-            <span id="page-title-clone" class="marquee-item" aria-hidden="true"></span>
           </div>
         </h2>
       </div>
@@ -700,7 +705,7 @@
     </div>
   </main>
 
-  <!-- MODAL TOP 5 CLIENTES COM GRÁFICO E TABELA (MAX-WIDTH e HEIGHT AUMENTADOS) -->
+  <!-- MODAL TOP 5 CLIENTES -->
   <div id="top5-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(10,15,30,.55); backdrop-filter: blur(6px);">
     <div class="panel max-w-5xl w-full p-6 space-y-5">
       <div class="flex items-center justify-between pb-4" style="border-bottom:1px solid var(--border)">
@@ -723,7 +728,6 @@
         </div>
       </div>
 
-      <!-- Container do Gráfico ampliado para maior área visual -->
       <div id="top5-chart-container" class="relative w-full h-96 flex items-center justify-center">
         <canvas id="top5Canvas"></canvas>
       </div>
@@ -738,7 +742,6 @@
   </div>
 
   <script>
-    // Registrar Plugin ChartDataLabels
     Chart.register(ChartDataLabels);
 
     const API_KEY = "AIzaSyBwvNC2bf6Ix8atG07BhzcvxhlnhyiPgv4";
@@ -773,13 +776,9 @@
       }
 
       renderConsultaTable();
-      fitMarquee();
-      window.addEventListener('beforeprint', fillPrintHeader);
-      window.addEventListener('resize', fitMarquee);
       
-      // Controlar ciclo do letreiro a cada iteração
       const marqueeTrack = document.getElementById('marquee-track');
-      marqueeTrack.addEventListener('animationiteration', stepMarqueeMessage);
+      marqueeTrack.addEventListener('animationend', stepMarqueeMessage);
 
       document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeTop5Modal(); });
       document.getElementById('login-user').addEventListener('keydown', (ev) => {
@@ -899,7 +898,8 @@
         if (result.error) throw new Error(result.error.message);
         if (result.values) {
           updatePendingSummary(result.values);
-          const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO"];
+          const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
+          
           rawData = result.values.map((row, index) => {
             return {
               rowIndex: index + 2,
@@ -912,13 +912,16 @@
               nomeMotorista: row[6] || '',
               municipioBairro: row[7] || '',
               rotaPrincipal: row[8] || '',
-              statusManual: row[9] || '', // Coluna J (índice 9)
+              statusManual: row[9] || '',
               statusAuto: String(row[10] || '').trim().toUpperCase(),
               observacao: row[11] || ''
             };
-          }).filter(item => allowedStatus.includes(item.statusAuto));
+          }).filter(item => {
+            // Descarta linhas sem NF ou sem dados válidos
+            if (!item.numNf && !item.razaoSocial && !item.data) return false;
+            return allowedStatus.includes(item.statusAuto);
+          });
 
-          // Somente renderiza a tabela se a busca já foi ativada previamente
           renderConsultaTable();
           showToast('Dados da Planilha Sincronizados!', 'success');
         } else {
@@ -940,7 +943,7 @@
       else ind.classList.add('hidden');
     }
 
-    /* ==================== LETREIRO CÍCLICO ==================== */
+    /* ==================== LETREIRO CÍCLICO REVISADO ==================== */
     let marqueeMessages = [];
     let currentMarqueeIndex = 0;
 
@@ -958,17 +961,28 @@
       return Date.UTC(y, m - 1, d);
     }
 
+    /**
+     * NOVA LÓGICA DE PENDÊNCIAS:
+     * Considera como PENDENTE toda linha válida da planilha em que a Coluna K (statusAuto)
+     * é DIFERENTE DE "RESOLVIDO", incluindo valores em branco ou vazios ("").
+     */
     function updatePendingSummary(values) {
       const now = new Date();
       const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
       let pending = 0, over7 = 0, oldestTs = null, oldestCount = 0;
 
       values.forEach(row => {
-        const st = String(row[10] || '').trim().toUpperCase();
-        if (!st || st === 'RESOLVIDO') return;
+        // Ignora linhas totalmente vazias da planilha
+        const hasData = row.some(cell => String(cell || '').trim() !== '');
+        if (!hasData) return;
+
+        const st = String(row[10] || '').trim().toUpperCase(); // Coluna K
+        
+        // PENDENTES = tudo diferente de RESOLVIDO (incluindo campos vazios "")
+        if (st === 'RESOLVIDO') return;
         pending++;
 
-        const ts = parseSheetDate(row[0]);
+        const ts = parseSheetDate(row[0]); // Coluna A
         if (ts === null) return;
         const days = Math.round((todayUTC - ts) / 86400000);
         if (days > 7) over7++;
@@ -991,28 +1005,34 @@
       }
       
       currentMarqueeIndex = 0;
-      setMarqueeText();
-      fitMarquee();
+      startMarqueeAnimation();
     }
 
-    function setMarqueeText() {
+    function startMarqueeAnimation() {
       if (marqueeMessages.length === 0) return;
-      const msg = marqueeMessages[currentMarqueeIndex];
-      document.getElementById('page-title').innerHTML = msg;
-      document.getElementById('page-title-clone').innerHTML = msg;
+      const titleEl = document.getElementById('page-title');
+      const trackEl = document.getElementById('marquee-track');
+      
+      titleEl.innerHTML = marqueeMessages[currentMarqueeIndex];
+      
+      // Reinicia a animação para a nova mensagem individual
+      trackEl.style.animation = 'none';
+      void trackEl.offsetWidth; // Força reflow
+      
+      // Calcula o tempo proporcional ao tamanho da mensagem
+      const textLength = titleEl.textContent.length;
+      const duration = Math.max(7, Math.min(14, textLength * 0.18));
+      
+      trackEl.style.animation = `marqueeSingleMessage ${duration}s linear 1`;
     }
 
     function stepMarqueeMessage() {
-      if (marqueeMessages.length <= 1) return;
+      if (marqueeMessages.length <= 1) {
+        startMarqueeAnimation();
+        return;
+      }
       currentMarqueeIndex = (currentMarqueeIndex + 1) % marqueeMessages.length;
-      setMarqueeText();
-    }
-
-    function fitMarquee() {
-      const track = document.querySelector('.marquee-track');
-      if (!track) return;
-      const unit = track.scrollWidth / 2;
-      if (unit > 0) track.style.animationDuration = Math.max(8, unit / 55) + 's';
+      startMarqueeAnimation();
     }
 
     function switchTab(tab) {
@@ -1084,7 +1104,6 @@
       const data = getFilteredConsultaData();
       const tbody = document.getElementById('table-body');
       
-      // O painel atualiza conforme o usuário faz a busca
       renderDashboardCards(hasSearched ? data : null);
 
       if (!hasSearched) {
@@ -1122,7 +1141,7 @@
 
       document.getElementById('dashboard-cards').innerHTML = statuses.map(st => `
         <div class="metal m-${st}">
-          <i class="fa-solid ${statusIcons[st]} metal-ico"></i>
+          <i class="fa-solid ${statusIcons[st] || 'fa-folder'} metal-ico"></i>
           <p class="metal-lbl">${st}</p>
           <h4 class="metal-num">${data ? counts[st] : '—'}</h4>
         </div>
@@ -1223,7 +1242,6 @@
         'rgba(245, 158, 11, 0.65)',
         'rgba(6, 182, 212, 0.65)'
       ];
-      // Cores destacadas para o Hover
       const hoverBgColors = [
         'rgba(99, 102, 241, 0.95)',
         'rgba(236, 72, 153, 0.95)',
@@ -1261,7 +1279,7 @@
               borderWidth: 1,
               padding: 10,
               boxPadding: 4,
-              displayColors: false, // Tooltip mais discreta/profissional
+              displayColors: false,
               callbacks: {
                 title: function(context) { return sortedData[context[0].dataIndex].razao; },
                 label: function(context) { return 'Ocorrências: ' + context.formattedValue; }
@@ -1282,7 +1300,6 @@
               beginAtZero: true,
               grid: { color: gridColor },
               ticks: { color: textColor, precision: 0 },
-              // Aumentar o limite superior para acomodar o DataLabel no topo sem cortar
               suggestedMax: Math.max(...sortedData.map(d => d.count)) * 1.15
             },
             x: {
@@ -1386,7 +1403,7 @@
           google.script.run
             .withSuccessHandler(r => (r && r.ok) ? resolve(r) : reject(new Error((r && r.error) || 'Falha ao gravar')))
             .withFailureHandler(err => reject(new Error((err && err.message) || String(err))))
-            .atualizarLinhas(updates); // O payload precisa estar programado lá pra escrever na Coluna J
+            .atualizarLinhas(updates);
         });
       }
       if (WEB_APP_URL) {
@@ -1420,14 +1437,11 @@
       const item = currentNfMatch;
       setSaving(true);
       try {
-        // Envio estruturado (Assegure que no back-end o índice reflete a Coluna J)
         const res = await persistUpdates([{ row: item.rowIndex, status: status, obs: obs, colStatus: 'J' }]);
 
-        // Reflete diretamente na memória do Painel (na Coluna J/statusManual)
         item.statusManual = status;
         item.observacao = obs;
         
-        // Renderiza apenas os dados atualmente pesquisados/filtrados
         renderConsultaTable();
 
         if (res) showToast(`NF ${item.numNf} gravada na planilha!`, 'success');
@@ -1470,7 +1484,6 @@
           if (res) saved = true;
         }
         
-        // Atualiza em memória o atributo equivalente à Coluna J e renderiza
         targets.forEach(it => { it.statusManual = 'ENVIADO'; });
         renderConsultaTable();
 
@@ -1496,4 +1509,3 @@
   </script>
 </body>
 </html>
-
