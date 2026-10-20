@@ -396,6 +396,74 @@
     .field-wrap .field { padding: .8rem 2.6rem .8rem 2.6rem; font-size: .9rem; }
     .field-wrap .eye { position: absolute; right: .6rem; top: 50%; transform: translateY(-50%); width: 2rem; height: 2rem; display: grid; place-items: center; color: var(--muted); cursor: pointer; border-radius: .5rem; }
     .field-wrap .eye:hover { color: var(--accent); }
+
+    /* Alternador de modo: "Quebra no Fluxo" usa tom de alerta */
+    .seg-btn.active.seg-break { background: linear-gradient(160deg, #fb7185, #e11d48); box-shadow: 0 0 12px rgba(244,63,94,.6); }
+
+    /* Cabeçalho do relatório (só aparece na impressão) */
+    .print-only { display: none; }
+
+    /* =========================================================
+       IMPRESSÃO — somente a tabela, A4 paisagem
+       ========================================================= */
+    @media print {
+      @page { size: A4 landscape; margin: 8mm; }
+
+      :root, html.dark {
+        color-scheme: light;
+        --text: #111; --muted: #333; --border: #9ca3af; --accent: #1e3a8a;
+        --th-bg: #e5e7eb; --row-alt: #f3f4f6; --row-hover: transparent;
+      }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+      html, body {
+        height: auto !important; width: auto !important; overflow: visible !important;
+        display: block !important; background: #fff !important; color: #000 !important;
+      }
+      .sidebar, .app-header, #login-screen, #toast, #top5-modal, #view-atualizacao,
+      #mode-row, #cards-row, #filters-panel { display: none !important; }
+
+      main, #main-scroll {
+        display: block !important; height: auto !important; overflow: visible !important;
+        padding: 0 !important; margin: 0 !important;
+      }
+      #view-consulta > * { margin-top: 0 !important; }
+
+      .print-only { display: block !important; margin-bottom: 4mm; color: #000; }
+      .print-only .ph-title { font-size: 13px; font-weight: 800; }
+      .print-only .ph-meta { font-size: 9px; margin-top: 2px; color: #333; }
+
+      .panel { background: #fff !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; overflow: visible !important; }
+      .tbl-wrap { max-height: none !important; overflow: visible !important; }
+
+      .tbl { width: 100% !important; table-layout: fixed; white-space: normal !important; font-size: 7.5px !important; color: #000; }
+      .tbl thead { display: table-header-group; }
+      .tbl thead th { position: static !important; background: #e5e7eb !important; color: #000 !important; padding: 3px 4px !important; font-size: 7px !important; letter-spacing: .02em !important; border-bottom: 1px solid #6b7280 !important; }
+      .tbl tbody td {
+        padding: 2px 4px !important; border-bottom: 1px solid #cbd5e1 !important;
+        white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+        max-width: none !important; overflow-wrap: anywhere; word-break: break-word;
+      }
+      .tbl tbody tr { page-break-inside: avoid; break-inside: avoid; background: transparent !important; }
+      .tbl tbody tr:nth-child(even) { background: #f3f4f6 !important; }
+      .tbl .t-accent { color: #1e3a8a !important; }
+      .tbl .t-muted { color: #333 !important; }
+      .tbl .badge { color: var(--tx-l) !important; padding: 1px 4px !important; font-size: 6.5px !important; }
+
+      /* Larguras das 12 colunas (somam 100%) */
+      .tbl th:nth-child(1)  { width: 6%; }   /* Data */
+      .tbl th:nth-child(2)  { width: 5%; }   /* Filial */
+      .tbl th:nth-child(3)  { width: 6%; }   /* Nº Carga */
+      .tbl th:nth-child(4)  { width: 7%; }   /* Nº NF */
+      .tbl th:nth-child(5)  { width: 6%; }   /* Cód. Cliente */
+      .tbl th:nth-child(6)  { width: 17%; }  /* Razão Social */
+      .tbl th:nth-child(7)  { width: 11%; }  /* Motorista */
+      .tbl th:nth-child(8)  { width: 11%; }  /* Município/Bairro */
+      .tbl th:nth-child(9)  { width: 8%; }   /* Rota Principal */
+      .tbl th:nth-child(10) { width: 7%; }   /* Status Manual */
+      .tbl th:nth-child(11) { width: 7%; }   /* Status Auto */
+      .tbl th:nth-child(12) { width: 9%; }   /* Observação */
+    }
   </style>
 </head>
 <body class="h-screen w-screen overflow-hidden flex">
@@ -524,8 +592,8 @@
       <div class="flex items-center flex-1 min-w-0 mr-6">
         <h2 class="marquee" aria-label="Título da página">
           <div class="marquee-track">
-            <span id="page-title" class="marquee-item">Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!</span>
-            <span class="marquee-item" aria-hidden="true">Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!</span>
+            <span id="page-title" class="marquee-item"></span>
+            <span class="marquee-item" aria-hidden="true"></span>
           </div>
         </h2>
       </div>
@@ -538,31 +606,50 @@
       </div>
     </header>
 
-    <div class="flex-1 overflow-auto p-8 relative">
+    <div id="main-scroll" class="flex-1 overflow-auto p-8 relative">
 
       <!-- ================= TELA 1: CONSULTA ================= -->
       <section id="view-consulta" class="space-y-6">
 
-        <!-- CARDS DE RESUMO METÁLICOS -->
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4" id="dashboard-cards">
-          <!-- Gerados dinamicamente no JS -->
+        <!-- ALTERNADOR DE MODO: FLUXO PADRÃO / QUEBRA NO FLUXO -->
+        <div id="mode-row" class="flex items-center gap-3 flex-wrap">
+          <span class="lbl" style="margin:0">Modo de visualização</span>
+          <div class="seg">
+            <button id="btn-flow-padrao" onclick="setFlowMode('padrao')" class="seg-btn active">
+              <i class="fa-solid fa-arrow-right-long mr-1"></i> Fluxo Padrão
+            </button>
+            <button id="btn-flow-quebra" onclick="setFlowMode('quebra')" class="seg-btn">
+              <i class="fa-solid fa-link-slash mr-1"></i> Quebra no Fluxo
+            </button>
+          </div>
+        </div>
+
+        <!-- CARDS DE RESUMO METÁLICOS + BOTÃO IMPRESSÃO -->
+        <div id="cards-row" class="flex items-stretch gap-4">
+          <div class="grid grid-cols-3 gap-4 flex-1" id="dashboard-cards">
+            <!-- Gerados dinamicamente no JS -->
+          </div>
+          <button onclick="printTable()" class="neon-btn" style="--neon-rgb:232,121,249; flex-direction:column; justify-content:center; padding:.6rem 1.5rem; letter-spacing:.1em;" title="Imprimir / salvar a tabela em PDF">
+            <i class="fa-solid fa-print fa-lg"></i>
+            <span>IMPRESSÃO</span>
+          </button>
         </div>
 
         <!-- FILTROS -->
-        <div class="panel p-5 flex flex-wrap items-end gap-4">
+        <div id="filters-panel" class="panel p-5 flex flex-wrap items-end gap-4">
           <div>
             <label class="lbl">Data Inicial</label>
-            <input type="date" id="filter-date-start" onchange="renderConsultaTable()" class="field">
+            <input type="date" id="filter-date-start" class="field">
           </div>
 
           <div>
             <label class="lbl">Data Final</label>
-            <input type="date" id="filter-date-end" onchange="renderConsultaTable()" class="field">
+            <input type="date" id="filter-date-end" class="field">
           </div>
 
           <div>
             <label class="lbl">Status Automático</label>
-            <select id="filter-status-auto" onchange="renderConsultaTable()" class="field" style="width:11rem">
+            <select id="filter-status-auto" class="field" style="width:11rem">
               <option value="TODOS">Todos os Status</option>
               <option value="PENDENTE">PENDENTE</option>
               <option value="ENVIADO">ENVIADO</option>
@@ -572,6 +659,11 @@
               <option value="RESOLVIDO">RESOLVIDO</option>
             </select>
           </div>
+
+          <button onclick="searchData()" class="neon-btn" style="--neon-rgb:52,211,153;">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Buscar Dados</span>
+          </button>
 
           <button onclick="clearFilters()" class="btn">
             <i class="fa-solid fa-filter-circle-xmark"></i>
@@ -588,6 +680,10 @@
 
         <!-- TABELA DE DADOS -->
         <div class="panel overflow-hidden">
+          <div id="print-header" class="print-only">
+            <div class="ph-title">Painel Controle de Canhotos — Relatório de Notas</div>
+            <div id="print-meta" class="ph-meta"></div>
+          </div>
           <div class="tbl-wrap">
             <table class="tbl">
               <thead>
@@ -784,7 +880,9 @@
       }
 
       updateBackendUI();
+      renderConsultaTable(); // estado inicial: cards zerados e aviso para buscar
       fitMarquee();
+      window.addEventListener('beforeprint', fillPrintHeader);
       window.addEventListener('resize', fitMarquee);
       document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeTop5Modal(); });
 
@@ -960,20 +1058,11 @@
       else ind.classList.add('hidden');
     }
 
-    // Título atual do letreiro e resumo de pendências (exibido antes do título)
-    let currentTitleText = "Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!";
+    // Letreiro: exibe somente o resumo de pendências (sem texto padrão)
     let pendingSummaryHtml = '';
 
-    function escapeHtml(str) {
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
-    // Atualiza o título do letreiro (todas as cópias do texto).
-    // Sem argumento, apenas redesenha com o título atual + resumo de pendências.
-    function setPageTitle(text) {
-      if (typeof text === 'string') currentTitleText = text;
-      const html = (pendingSummaryHtml ? pendingSummaryHtml + '<span class="mq-sep">.</span>' : '') + escapeHtml(currentTitleText);
-      document.querySelectorAll('.marquee-item').forEach(el => { el.innerHTML = html; });
+    function setPageTitle() {
+      document.querySelectorAll('.marquee-item').forEach(el => { el.innerHTML = pendingSummaryHtml; });
       fitMarquee();
     }
 
@@ -994,8 +1083,11 @@
 
     /**
      * RESUMO DE PENDÊNCIAS (letreiro)
-     * Critério: todas as linhas da planilha cujo status (coluna K) seja diferente de RESOLVIDO.
+     * Pendente = qualquer linha da planilha com status (coluna K) diferente de RESOLVIDO.
      * Datas vêm da coluna A. Não depende dos filtros da tela.
+     *  1) total de notas pendentes de assinatura
+     *  2) pendentes com mais de 7 dias
+     *  3) quantidade de pendentes que têm a data mais antiga (e há quantos dias)
      */
     function updatePendingSummary(values) {
       const now = new Date();
@@ -1020,21 +1112,20 @@
       } else {
         const parts = [];
         parts.push(`Notas pendentes de assinatura: <strong class="mq-warn">${pending}</strong>`);
+        parts.push(`Pendentes com mais de 7 dias: <strong class="mq-danger">${over7}</strong>`);
 
         if (oldestTs !== null) {
           const oldDays = Math.max(0, Math.round((todayUTC - oldestTs) / 86400000));
-          const dayTxt = oldDays === 0 ? 'hoje' : (oldDays === 1 ? '1 dia' : oldDays + ' dias');
-          const qtyTxt = oldestCount > 1 ? ` (${oldestCount} notas com essa data)` : '';
-          parts.push(`Nota mais antiga: <strong class="mq-warn">${dayTxt}</strong>${qtyTxt}`);
+          const dayTxt = oldDays === 0 ? 'hoje' : (oldDays === 1 ? 'há 1 dia' : `há ${oldDays} dias`);
+          const pl = oldestCount > 1;
+          parts.push(`Data mais antiga: <strong class="mq-danger">${oldestCount}</strong> ${pl ? 'notas pendentes' : 'nota pendente'} (${dayTxt})`);
         }
 
-        parts.push(`Notas com mais de 7 dias: <strong class="mq-danger">${over7}</strong>`);
         pendingSummaryHtml = '<i class="fa-solid fa-triangle-exclamation mq-warn"></i> '
           + parts.join('<span class="mq-sep">•</span>');
       }
       setPageTitle();
     }
-
     // Mantém a velocidade do letreiro constante (~55px/s) em qualquer largura de tela
     function fitMarquee() {
       const track = document.querySelector('.marquee-track');
@@ -1055,21 +1146,53 @@
         btnAtualizacao.classList.remove('active');
         viewConsulta.classList.remove('hidden');
         viewAtualizacao.classList.add('hidden');
-        setPageTitle("Consulta de Registros . Seja Bem-Vindo ao Painel de Controle de Canhotos!");
       } else {
         btnAtualizacao.classList.add('active');
         btnConsulta.classList.remove('active');
         viewAtualizacao.classList.remove('hidden');
         viewConsulta.classList.add('hidden');
-        setPageTitle("Atualização de Status . Seja Bem-Vindo ao Painel de Controle de Canhotos!");
       }
     }
 
-    // FILTRAR DADOS
+    // ESTADO DA BUSCA: os dados só aparecem após selecionar os filtros e clicar em "Buscar Dados"
+    let hasSearched = false;
+    let activeFilters = { start: '', end: '', status: 'TODOS' };
+
+    // MODOS DOS CARDS (status de referência = coluna K)
+    let flowMode = 'padrao';
+    const FLOW_MODES = {
+      padrao: { statuses: ['IMPRESSO', 'ENVIADO', 'RESOLVIDO'] },   // Fluxo Padrão
+      quebra: { statuses: ['PENDENTE', 'RETORNO', 'TRANSFERIR'] }   // Quebra no Fluxo
+    };
+
+    function setFlowMode(mode) {
+      flowMode = mode;
+      const bP = document.getElementById('btn-flow-padrao');
+      const bQ = document.getElementById('btn-flow-quebra');
+      bP.classList.toggle('active', mode === 'padrao');
+      bQ.classList.toggle('active', mode === 'quebra');
+      bQ.classList.toggle('seg-break', mode === 'quebra');
+      renderDashboardCards(hasSearched ? getFilteredConsultaData() : null);
+    }
+
+    function searchData() {
+      const start = document.getElementById('filter-date-start').value;
+      const end = document.getElementById('filter-date-end').value;
+      const status = document.getElementById('filter-status-auto').value;
+
+      if (start && end && start > end) return showToast('A Data Inicial não pode ser maior que a Data Final.', 'error');
+
+      activeFilters = { start, end, status };
+      hasSearched = true;
+      renderConsultaTable();
+    }
+
+    // FILTRAR DADOS (usa os filtros aplicados no último clique em "Buscar Dados")
     function getFilteredConsultaData() {
-      const startDate = document.getElementById('filter-date-start').value;
-      const endDate = document.getElementById('filter-date-end').value;
-      const statusAuto = document.getElementById('filter-status-auto').value;
+      if (!hasSearched) return [];
+      const startDate = activeFilters.start;
+      const endDate = activeFilters.end;
+      const statusAuto = activeFilters.status;
 
       return rawData.filter(item => {
         // Conversão de data para comparar corretamente (YYYY-MM-DD)
@@ -1088,7 +1211,12 @@
       const data = getFilteredConsultaData();
       const tbody = document.getElementById('table-body');
 
-      renderDashboardCards(data);
+      renderDashboardCards(hasSearched ? data : null);
+
+      if (!hasSearched) {
+        tbody.innerHTML = '<tr><td colspan="12" class="p-8 text-center t-muted italic">Selecione os filtros e clique em "Buscar Dados" para exibir os registros.</td></tr>';
+        return;
+      }
 
       if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="12" class="p-8 text-center t-muted italic">Nenhum registro encontrado.</td></tr>';
@@ -1113,36 +1241,20 @@
       `).join('');
     }
 
+    // data = null → ainda não houve busca (mostra "—")
     function renderDashboardCards(data) {
-      const counts = { TOTAL: data.length, PENDENTE: 0, ENVIADO: 0, IMPRESSO: 0, RETORNO: 0, TRANSFERIR: 0, RESOLVIDO: 0 };
+      const statuses = FLOW_MODES[flowMode].statuses;
+      const counts = {};
+      statuses.forEach(st => { counts[st] = 0; });
+      if (data) data.forEach(item => { if (counts[item.statusAuto] !== undefined) counts[item.statusAuto]++; });
 
-      data.forEach(item => {
-        if (counts[item.statusAuto] !== undefined) counts[item.statusAuto]++;
-      });
-
-      const container = document.getElementById('dashboard-cards');
-
-      // Card Total (aço)
-      let html = `
-        <div class="metal m-TOTAL">
-          <i class="fa-solid fa-layer-group metal-ico"></i>
-          <p class="metal-lbl">Total Geral</p>
-          <h4 class="metal-num">${counts.TOTAL}</h4>
+      document.getElementById('dashboard-cards').innerHTML = statuses.map(st => `
+        <div class="metal m-${st}">
+          <i class="fa-solid ${statusIcons[st]} metal-ico"></i>
+          <p class="metal-lbl">${st}</p>
+          <h4 class="metal-num">${data ? counts[st] : '—'}</h4>
         </div>
-      `;
-
-      // Cards Status (cada um com sua cor metálica)
-      Object.keys(statusIcons).forEach(st => {
-        html += `
-          <div class="metal m-${st}">
-            <i class="fa-solid ${statusIcons[st]} metal-ico"></i>
-            <p class="metal-lbl">${st}</p>
-            <h4 class="metal-num">${counts[st]}</h4>
-          </div>
-        `;
-      });
-
-      container.innerHTML = html;
+      `).join('');
     }
 
     function renderStatusBadge(status) {
@@ -1156,13 +1268,41 @@
       document.getElementById('filter-date-start').value = '';
       document.getElementById('filter-date-end').value = '';
       document.getElementById('filter-status-auto').value = 'TODOS';
+      hasSearched = false;
+      activeFilters = { start: '', end: '', status: 'TODOS' };
       renderConsultaTable();
+    }
+
+    /**
+     * IMPRESSÃO — abre a janela de impressão do navegador (também permite "Salvar como PDF").
+     * O CSS @media print mostra só a tabela, em A4 paisagem.
+     */
+    function fmtDateBr(iso) { return iso ? iso.split('-').reverse().join('/') : ''; }
+
+    function fillPrintHeader() {
+      const data = getFilteredConsultaData();
+      const f = activeFilters;
+      let periodo = 'Todo o período';
+      if (f.start && f.end) periodo = fmtDateBr(f.start) + ' a ' + fmtDateBr(f.end);
+      else if (f.start) periodo = 'A partir de ' + fmtDateBr(f.start);
+      else if (f.end) periodo = 'Até ' + fmtDateBr(f.end);
+
+      const meta = document.getElementById('print-meta');
+      if (meta) meta.textContent = `Período: ${periodo}  |  Status Automático: ${f.status === 'TODOS' ? 'Todos' : f.status}  |  Total de registros: ${data.length}  |  Emitido em: ${new Date().toLocaleString('pt-BR')}`;
+    }
+
+    function printTable() {
+      if (!hasSearched) return showToast('Selecione os filtros e clique em "Buscar Dados" antes de imprimir.', 'warn');
+      if (getFilteredConsultaData().length === 0) return showToast('Não há registros para imprimir.', 'warn');
+      fillPrintHeader();
+      window.print();
     }
 
     /**
      * LÓGICA DO MODAL TOP 5 COM GRÁFICO E LISTA
      */
     function openTop5Modal(showModal = true) {
+      if (showModal && !hasSearched) return showToast('Clique em "Buscar Dados" antes de abrir a análise.', 'warn');
       const data = getFilteredConsultaData();
       const counts = {};
 
@@ -1495,3 +1635,4 @@
   </script>
 </body>
 </html>
+
