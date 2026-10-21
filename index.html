@@ -476,6 +476,48 @@
     .seg-btn.active.seg-break { background: linear-gradient(160deg, #fb7185, #e11d48); box-shadow: 0 0 12px rgba(244,63,94,.6); }
     .print-only { display: none; }
 
+    .seg-btn.active.seg-full { background: linear-gradient(160deg, #22d3ee, #0891b2); box-shadow: 0 0 12px rgba(34,211,238,.6); }
+    .neon-btn.is-on { background: rgba(var(--neon-rgb), .28); box-shadow: 0 0 18px rgba(var(--neon-rgb), .9), 0 0 38px rgba(var(--neon-rgb), .4), inset 0 0 14px rgba(var(--neon-rgb), .3); }
+
+    /* =========================================================
+       CARDS CLICÁVEIS / MODO COMPACTO (Fluxo Integral)
+       ========================================================= */
+    .cards-grid { display: grid; gap: 1rem; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1 1 0%; min-width: 0; }
+    .cards-grid.compact { grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .6rem; }
+    .metal.clickable { cursor: pointer; user-select: none; }
+    .metal.clickable:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .cards-grid.compact .metal { display: flex; flex-direction: column; justify-content: space-between; padding: .6rem .75rem .55rem; border-radius: .8rem; }
+    .cards-grid.compact .metal-lbl { font-size: .56rem; letter-spacing: .1em; line-height: 1.25; margin-bottom: .25rem; padding-right: 1.1rem; }
+    .cards-grid.compact .metal-num { font-size: 1.4rem; }
+    .cards-grid.compact .metal-ico { font-size: .8rem; right: .55rem; top: .55rem; }
+    .m-SEM_ASSINATURA { --m1:#f0a8f7; --m2:#c026d3; --m3:#86198f; --m-edge:rgba(245,208,254,.9); --m-glow:rgba(217,70,239,.60); }
+    .metal.selected, .metal.selected:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 0 0 2px rgba(255,255,255,.95), 0 0 22px 4px var(--m-glow), 0 18px 30px -12px var(--m-glow), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -3px 8px rgba(0,0,0,.28);
+    }
+
+    /* =========================================================
+       DASHBOARD NEON (Fluxo Integral)
+       ========================================================= */
+    .neon-card {
+      --nc: 34,211,238;
+      position: relative; border-radius: 1rem; padding: 1.1rem 1.25rem 1.25rem; color: #e6ebf7;
+      background: radial-gradient(120% 90% at 8% 0%, rgba(var(--nc), .13), transparent 60%),
+                  linear-gradient(160deg, #080d1c 0%, #0f1730 55%, #0a1124 100%);
+      border: 1px solid rgba(var(--nc), .5);
+      box-shadow: 0 0 20px rgba(var(--nc), .20), 0 18px 36px -16px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 28px rgba(var(--nc), .06);
+    }
+    .neon-card.nc-violet { --nc: 167,139,250; }
+    .neon-card.nc-pink   { --nc: 232,121,249; }
+    .nc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .neon-card h4 { display: flex; align-items: center; gap: .55rem; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #f1f5ff; text-shadow: 0 0 10px rgba(var(--nc), .85); }
+    .neon-card h4 i { color: rgb(var(--nc)); filter: drop-shadow(0 0 5px rgb(var(--nc))); }
+    .nc-sub { margin-top: .2rem; font-size: .68rem; color: #8fa1c7; }
+    .nc-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .7rem; border-radius: 999px; font-size: .7rem; font-weight: 800; color: #e6ebf7;
+      background: rgba(var(--c), .14); border: 1px solid rgba(var(--c), .65); box-shadow: 0 0 10px rgba(var(--c), .3); }
+    .neon-chart { position: relative; height: 20rem; margin-top: 1rem; }
+    .neon-chart.tall { height: 23rem; }
+
     /* =========================================================
        IMPRESSÃO
        ========================================================= */
@@ -488,7 +530,7 @@
       }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       html, body { height: auto !important; width: auto !important; overflow: visible !important; display: block !important; background: #fff !important; color: #000 !important; }
-      .sidebar, .app-header, #login-screen, #toast, #top5-modal, #view-atualizacao, #mode-row, #cards-row, #filters-panel { display: none !important; }
+      .sidebar, .app-header, #login-screen, #toast, #top5-modal, #view-atualizacao, #mode-row, #cards-row, #filters-panel, #table-info, #dashboard-view { display: none !important; }
       main, #main-scroll { display: block !important; height: auto !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; }
       #view-consulta > * { margin-top: 0 !important; }
       .print-only { display: block !important; margin-bottom: 4mm; color: #000; }
@@ -652,11 +694,17 @@
             <button id="btn-flow-quebra" onclick="setFlowMode('quebra')" class="seg-btn">
               <i class="fa-solid fa-link-slash mr-1"></i> Quebra no Fluxo
             </button>
+            <button id="btn-flow-integral" onclick="setFlowMode('integral')" class="seg-btn">
+              <i class="fa-solid fa-layer-group mr-1"></i> Fluxo Integral
+            </button>
           </div>
+          <button id="btn-dashboard" onclick="toggleDashboard()" class="neon-btn hidden" style="--neon-rgb:34,211,238; padding:.5rem 1rem;" title="Alternar entre a tabela e os gráficos">
+            <i id="dash-ico" class="fa-solid fa-chart-pie"></i><span id="dash-label">DashBoard</span>
+          </button>
         </div>
 
         <div id="cards-row" class="flex items-stretch gap-4">
-          <div class="grid grid-cols-3 gap-4 flex-1" id="dashboard-cards"></div>
+          <div class="cards-grid" id="dashboard-cards"></div>
           <button onclick="printTable()" class="neon-btn" style="--neon-rgb:232,121,249; flex-direction:column; justify-content:center; padding:.6rem 1.5rem; letter-spacing:.1em;" title="Imprimir / salvar a tabela em PDF">
             <i class="fa-solid fa-print fa-lg"></i><span>IMPRESSÃO</span>
           </button>
@@ -681,6 +729,7 @@
               <option value="RETORNO">RETORNO</option>
               <option value="TRANSFERIR">TRANSFERIR</option>
               <option value="RESOLVIDO">RESOLVIDO</option>
+              <option value="SEM_ASSINATURA">TOTAL SEM ASSINATURA</option>
             </select>
           </div>
           <button onclick="searchData()" class="neon-btn" style="--neon-rgb:52,211,153;">
@@ -696,7 +745,9 @@
           </div>
         </div>
 
-        <div class="panel overflow-hidden">
+        <div id="table-info" class="hidden flex items-center gap-2 flex-wrap text-xs"></div>
+
+        <div id="table-panel" class="panel overflow-hidden">
           <div id="print-header" class="print-only">
             <div class="ph-title">Painel Controle de Canhotos — Relatório de Notas</div>
             <div id="print-meta" class="ph-meta"></div>
@@ -712,6 +763,42 @@
               </thead>
               <tbody id="table-body" class="font-mono"></tbody>
             </table>
+          </div>
+        </div>
+      <!-- DASHBOARD (visível apenas no Fluxo Integral) -->
+        <div id="dashboard-view" class="hidden space-y-5">
+          <div class="flex items-center gap-2 text-xs t-muted">
+            <i class="fa-solid fa-calendar-days t-accent"></i><span id="dash-period-info"></span>
+          </div>
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            <div class="neon-card">
+              <div class="nc-head">
+                <div>
+                  <h4><i class="fa-solid fa-chart-column"></i><span>Ocorrências por Status</span></h4>
+                  <p id="bar-sub" class="nc-sub"></p>
+                </div>
+              </div>
+              <div class="neon-chart"><canvas id="dashBarCanvas"></canvas></div>
+            </div>
+            <div class="neon-card nc-violet">
+              <div class="nc-head">
+                <div>
+                  <h4><i class="fa-solid fa-chart-pie"></i><span>Percentual por Status</span></h4>
+                  <p id="pie-sub" class="nc-sub"></p>
+                </div>
+              </div>
+              <div class="neon-chart"><canvas id="dashPieCanvas"></canvas></div>
+            </div>
+          </div>
+          <div class="neon-card nc-pink">
+            <div class="nc-head">
+              <div>
+                <h4><i class="fa-solid fa-code-compare"></i><span>Comparativo: Período x Mês Anterior</span></h4>
+                <p id="cmp-sub" class="nc-sub"></p>
+              </div>
+              <div id="cmp-chips" class="flex items-center gap-2 flex-wrap"></div>
+            </div>
+            <div class="neon-chart tall"><canvas id="dashCompareCanvas"></canvas></div>
           </div>
         </div>
       </section>
@@ -730,11 +817,22 @@
               <input type="date" id="upd-period-end" onchange="checkNfInPeriod()" class="field" style="padding:.7rem .9rem">
             </div>
           </div>
-          <div class="divider pt-3 flex items-center justify-between">
-            <span class="text-xs t-muted">Atualizar todas as ocorrências do período (Coluna J) para "ENVIADO":</span>
-            <button onclick="executeBulkUpdate()" class="neon-btn" style="--neon-rgb:59,130,246;">
-              <i class="fa-solid fa-paper-plane"></i><span>Atualizar p/ "ENVIADO"</span>
-            </button>
+          <div class="divider pt-3 flex items-center justify-between flex-wrap gap-3">
+            <span class="text-xs t-muted">Atualizar todas as ocorrências do período (Coluna J) para o status escolhido:</span>
+            <div class="flex items-center gap-3 flex-wrap">
+              <select id="upd-bulk-status" onchange="onBulkStatusChange()" class="field" style="width:11rem; padding:.55rem .8rem">
+                <option value="">-- Status --</option>
+                <option value="PENDENTE">PENDENTE</option>
+                <option value="ENVIADO">ENVIADO</option>
+                <option value="IMPRESSO">IMPRESSO</option>
+                <option value="RETORNO">RETORNO</option>
+                <option value="TRANSFERIR">TRANSFERIR</option>
+                <option value="RESOLVIDO">RESOLVIDO</option>
+              </select>
+              <button onclick="executeBulkUpdate()" class="neon-btn" style="--neon-rgb:59,130,246;">
+                <i class="fa-solid fa-paper-plane"></i><span id="bulk-btn-label">Atualizar período</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1134,21 +1232,65 @@
     }
 
     let hasSearched = false;
+    let dashboardOpen = false;
     let activeFilters = { start: '', end: '', status: 'TODOS' };
     let flowMode = 'padrao';
+
+    // cards = o que aparece em cada modo | scope = status exibidos na tabela quando nenhum card/filtro de status está ativo
     const FLOW_MODES = {
-      padrao: { statuses: ['IMPRESSO', 'ENVIADO', 'RESOLVIDO'] },
-      quebra: { statuses: ['PENDENTE', 'RETORNO', 'TRANSFERIR'] }
+      padrao:   { label: 'Fluxo Padrão',    cards: ['IMPRESSO', 'ENVIADO', 'RESOLVIDO'],
+                  scope: ['IMPRESSO', 'ENVIADO', 'RESOLVIDO'] },
+      quebra:   { label: 'Quebra no Fluxo', cards: ['PENDENTE', 'RETORNO', 'SEM_ASSINATURA'],
+                  scope: ['PENDENTE', 'RETORNO', 'TRANSFERIR'] },
+      integral: { label: 'Fluxo Integral',  cards: ['PENDENTE', 'IMPRESSO', 'ENVIADO', 'RETORNO', 'RESOLVIDO', 'SEM_ASSINATURA'],
+                  scope: null } // null = todos os status
     };
+    const CARD_META = {
+      SEM_ASSINATURA: { label: 'TOTAL SEM ASSINATURA', icon: 'fa-file-circle-xmark' }
+    };
+
+    function statusLabel(key) { return CARD_META[key] ? CARD_META[key].label : key; }
 
     function setFlowMode(mode) {
       flowMode = mode;
+      // ao trocar de modo, o filtro de status (card/lista) volta para "Todos"
+      activeFilters.status = 'TODOS';
+      document.getElementById('filter-status-auto').value = 'TODOS';
+
       const bP = document.getElementById('btn-flow-padrao');
       const bQ = document.getElementById('btn-flow-quebra');
+      const bI = document.getElementById('btn-flow-integral');
       bP.classList.toggle('active', mode === 'padrao');
       bQ.classList.toggle('active', mode === 'quebra');
+      bI.classList.toggle('active', mode === 'integral');
       bQ.classList.toggle('seg-break', mode === 'quebra');
-      renderDashboardCards(hasSearched ? getFilteredConsultaData() : null);
+      bI.classList.toggle('seg-full', mode === 'integral');
+
+      document.getElementById('btn-dashboard').classList.toggle('hidden', mode !== 'integral');
+      if (mode !== 'integral' && dashboardOpen) setDashboardView(false);
+      renderConsultaTable();
+    }
+
+    // Clique em um card: filtra a tabela pelo status do card (clicar de novo remove o filtro)
+    function onCardClick(key) {
+      let start = activeFilters.start, end = activeFilters.end;
+      if (!hasSearched) {
+        start = document.getElementById('filter-date-start').value;
+        end = document.getElementById('filter-date-end').value;
+        if (start && end && start > end) return showToast('A Data Inicial não pode ser maior que a Data Final.', 'error');
+      }
+      const status = (hasSearched && activeFilters.status === key) ? 'TODOS' : key;
+      activeFilters = { start, end, status };
+      hasSearched = true;
+      document.getElementById('filter-status-auto').value = status;
+      if (dashboardOpen) setDashboardView(false);
+      renderConsultaTable();
+    }
+
+    function clearStatusFilter() {
+      activeFilters.status = 'TODOS';
+      document.getElementById('filter-status-auto').value = 'TODOS';
+      renderConsultaTable();
     }
 
     function searchData() {
@@ -1156,34 +1298,56 @@
       const end = document.getElementById('filter-date-end').value;
       const status = document.getElementById('filter-status-auto').value;
       if (start && end && start > end) return showToast('A Data Inicial não pode ser maior que a Data Final.', 'error');
-      
+
       activeFilters = { start, end, status };
       hasSearched = true;
       renderConsultaTable();
     }
 
+    // Data da linha em AAAA-MM-DD (aceita dd/mm/aaaa e aaaa-mm-dd)
+    function itemIso(item) {
+      const ts = parseSheetDate(item.data);
+      return ts === null ? null : new Date(ts).toISOString().slice(0, 10);
+    }
+
+    function filterByRange(start, end) {
+      return rawData.filter(item => {
+        const iso = itemIso(item);
+        if (start && (!iso || iso < start)) return false;
+        if (end && (!iso || iso > end)) return false;
+        return true;
+      });
+    }
+
+    // Dados do período consultado (sem filtro de status) — base dos cards e do dashboard
+    function getDateFilteredData() {
+      if (!hasSearched) return [];
+      return filterByRange(activeFilters.start, activeFilters.end);
+    }
+
+    function matchesStatus(item, key) {
+      if (key === 'SEM_ASSINATURA') return item.statusAuto !== 'RESOLVIDO';
+      return item.statusAuto === key;
+    }
+
+    // Dados da tabela: período + (card/status escolhido) ou, se nenhum, os status do modo atual
     function getFilteredConsultaData() {
       if (!hasSearched) return [];
-      const startDate = activeFilters.start;
-      const endDate = activeFilters.end;
-      const statusAuto = activeFilters.status;
-
-      return rawData.filter(item => {
-        let itemDateStr = item.data.split('/').reverse().join('-'); 
-        if (item.data.includes('-')) itemDateStr = item.data; 
-
-        if (startDate && itemDateStr < startDate) return false;
-        if (endDate && itemDateStr > endDate) return false;
-        if (statusAuto !== 'TODOS' && item.statusAuto !== statusAuto) return false;
-        return true;
+      const st = activeFilters.status;
+      const scope = FLOW_MODES[flowMode].scope;
+      return getDateFilteredData().filter(item => {
+        if (st !== 'TODOS') return matchesStatus(item, st);
+        return !scope || scope.includes(item.statusAuto);
       });
     }
 
     function renderConsultaTable() {
       const data = getFilteredConsultaData();
       const tbody = document.getElementById('table-body');
-      
-      renderDashboardCards(hasSearched ? data : null);
+
+      renderDashboardCards(hasSearched ? getDateFilteredData() : null);
+      renderTableInfo(data);
+      if (dashboardOpen) renderDashboard();
 
       if (!hasSearched) {
         tbody.innerHTML = '<tr><td colspan="12" class="p-8 text-center t-muted italic">Selecione os filtros e clique em "Buscar Dados" para exibir os registros.</td></tr>';
@@ -1212,19 +1376,37 @@
       `).join('');
     }
 
-    function renderDashboardCards(data) {
-      const statuses = FLOW_MODES[flowMode].statuses;
-      const counts = {};
-      statuses.forEach(st => { counts[st] = 0; });
-      if (data) data.forEach(item => { if (counts[item.statusAuto] !== undefined) counts[item.statusAuto]++; });
+    function renderTableInfo(data) {
+      const el = document.getElementById('table-info');
+      if (!hasSearched || dashboardOpen) { el.classList.add('hidden'); return; }
+      const st = activeFilters.status;
+      el.innerHTML =
+        `<span class="badge st-ENVIADO">${FLOW_MODES[flowMode].label.toUpperCase()}</span>` +
+        `<span class="t-muted">Exibindo:</span> <strong>${st === 'TODOS' ? 'todos os status do modo' : statusLabel(st)}</strong>` +
+        `<span class="t-muted">· ${data.length} registro(s)</span>` +
+        (st !== 'TODOS' ? `<button class="btn" style="padding:.2rem .65rem; font-size:.68rem" onclick="clearStatusFilter()"><i class="fa-solid fa-xmark"></i>Remover filtro</button>` : '');
+      el.classList.remove('hidden');
+    }
 
-      document.getElementById('dashboard-cards').innerHTML = statuses.map(st => `
-        <div class="metal m-${st}">
-          <i class="fa-solid ${statusIcons[st] || 'fa-folder'} metal-ico"></i>
-          <p class="metal-lbl">${st}</p>
-          <h4 class="metal-num">${data ? counts[st] : '—'}</h4>
-        </div>
-      `).join('');
+    function renderDashboardCards(list) {
+      const grid = document.getElementById('dashboard-cards');
+      const keys = FLOW_MODES[flowMode].cards;
+      grid.classList.toggle('compact', flowMode === 'integral');
+
+      grid.innerHTML = keys.map(key => {
+        const meta = CARD_META[key] || { label: key, icon: statusIcons[key] || 'fa-folder' };
+        const total = list ? list.filter(item => matchesStatus(item, key)).length : '—';
+        const sel = hasSearched && activeFilters.status === key;
+        return `
+        <div class="metal clickable m-${key} ${sel ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${sel}"
+             title="Clique para filtrar a tabela por ${meta.label}"
+             onclick="onCardClick('${key}')"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onCardClick('${key}')}">
+          <i class="fa-solid ${meta.icon} metal-ico"></i>
+          <p class="metal-lbl">${meta.label}</p>
+          <h4 class="metal-num">${total}</h4>
+        </div>`;
+      }).join('');
     }
 
     function renderStatusBadge(status) {
@@ -1240,6 +1422,7 @@
       document.getElementById('filter-status-auto').value = 'TODOS';
       hasSearched = false;
       activeFilters = { start: '', end: '', status: 'TODOS' };
+      if (dashboardOpen) setDashboardView(false);
       renderConsultaTable();
     }
 
@@ -1253,10 +1436,11 @@
       else if (f.start) periodo = 'A partir de ' + fmtDateBr(f.start);
       else if (f.end) periodo = 'Até ' + fmtDateBr(f.end);
       const meta = document.getElementById('print-meta');
-      if (meta) meta.textContent = `Período: ${periodo}  |  Status Automático: ${f.status === 'TODOS' ? 'Todos' : f.status}  |  Total de registros: ${data.length}  |  Emitido em: ${new Date().toLocaleString('pt-BR')}`;
+      if (meta) meta.textContent = `Período: ${periodo}  |  Modo: ${FLOW_MODES[flowMode].label}  |  Status: ${f.status === 'TODOS' ? 'Todos do modo' : statusLabel(f.status)}  |  Total de registros: ${data.length}  |  Emitido em: ${new Date().toLocaleString('pt-BR')}`;
     }
 
     function printTable() {
+      if (dashboardOpen) return showToast('Volte para a tabela para imprimir.', 'warn');
       if (!hasSearched) return showToast('Selecione os filtros e clique em "Buscar Dados" antes de imprimir.', 'warn');
       if (getFilteredConsultaData().length === 0) return showToast('Não há registros para imprimir.', 'warn');
       fillPrintHeader();
@@ -1413,6 +1597,237 @@
       document.getElementById('top5-modal').classList.add('hidden');
     }
 
+    /* ================== DASHBOARD NEON (FLUXO INTEGRAL) ================== */
+    const DASH_STATUSES = ['PENDENTE', 'IMPRESSO', 'ENVIADO', 'RETORNO', 'TRANSFERIR', 'RESOLVIDO'];
+    const NEON = { PENDENTE: '#fbbf24', IMPRESSO: '#a78bfa', ENVIADO: '#60a5fa', RETORNO: '#fb7185', TRANSFERIR: '#22d3ee', RESOLVIDO: '#34d399', 'SEM STATUS': '#94a3b8' };
+    let dashCharts = { bar: null, cmp: null, pie: null };
+
+    // Efeito neon: halo (sombra) na cor de cada barra/fatia, mantendo o preenchimento translúcido
+    function rrPath(ctx, x, y, w, h, r) {
+      r = Math.max(0, Math.min(r, w / 2, h));
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h);
+      ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+      ctx.closePath();
+    }
+    const neonGlow = {
+      id: 'neonGlow',
+      beforeDatasetDraw(chart, args) {
+        const ctx = chart.ctx, area = chart.chartArea;
+        args.meta.data.forEach(el => {
+          if (!el || el.skip) return;
+          const o = el.options || {};
+          const col = typeof o.borderColor === 'string' ? o.borderColor : '#22d3ee';
+          const isBar = typeof el.base === 'number' && typeof el.width === 'number';
+          if (isBar) {
+            // barras: o desenho nativo é recortado no próprio retângulo, então o halo é desenhado à parte
+            const p = el.getProps(['x', 'y', 'base', 'width'], true);
+            const top = Math.min(p.y, p.base), h = Math.abs(p.base - p.y), x = p.x - p.width / 2;
+            if (h >= 1) {
+              const r = typeof o.borderRadius === 'number' ? o.borderRadius : 8;
+              ctx.save();
+              ctx.shadowColor = col; ctx.shadowBlur = el.active ? 34 : 24;
+              ctx.fillStyle = col; rrPath(ctx, x, top, p.width, h, r); ctx.fill();
+              ctx.globalCompositeOperation = 'destination-out';
+              ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+              ctx.fillStyle = '#000'; rrPath(ctx, x, top, p.width, h, r); ctx.fill();
+              ctx.restore();
+            }
+            el.draw(ctx, area);
+          } else {
+            // fatias: a sombra do próprio desenho já cria o halo
+            ctx.save();
+            ctx.shadowColor = col; ctx.shadowBlur = el.active ? 34 : 22;
+            el.draw(ctx, area);
+            ctx.restore();
+          }
+        });
+        return false;
+      }
+    };
+
+    function hexA(hex, a) {
+      const n = parseInt(hex.slice(1), 16);
+      return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+    }
+    function isoToUTC(iso) { const p = iso.split('-').map(Number); return Date.UTC(p[0], p[1] - 1, p[2]); }
+    function utcToIso(ts) { return new Date(ts).toISOString().slice(0, 10); }
+    function addDaysIso(iso, n) { return utcToIso(isoToUTC(iso) + n * 86400000); }
+    // Mesmo dia do mês anterior (se o mês anterior for mais curto, usa o último dia dele)
+    function shiftMonthBack(iso) {
+      const p = iso.split('-').map(Number);
+      let y = p[0], m = p[1] - 1;
+      if (m < 1) { m = 12; y--; }
+      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      return utcToIso(Date.UTC(y, m - 1, Math.min(p[2], last)));
+    }
+
+    // Período consultado e o período equivalente do mês anterior (mesma quantidade de dias)
+    function getComparisonPeriods() {
+      const isos = rawData.map(itemIso).filter(Boolean).sort();
+      const n = new Date();
+      const todayIso = utcToIso(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()));
+      const start = activeFilters.start || isos[0] || todayIso;
+      let end = activeFilters.end || isos[isos.length - 1] || todayIso;
+      if (end < start) end = start;
+      const days = Math.round((isoToUTC(end) - isoToUTC(start)) / 86400000) + 1;
+      const prevStart = shiftMonthBack(start);
+      const prevEnd = addDaysIso(prevStart, days - 1);
+      return { start, end, days, prevStart, prevEnd };
+    }
+
+    function countByStatus(list) {
+      const c = {};
+      DASH_STATUSES.forEach(s => { c[s] = 0; });
+      c['SEM STATUS'] = 0;
+      list.forEach(item => { c[DASH_STATUSES.includes(item.statusAuto) ? item.statusAuto : 'SEM STATUS']++; });
+      return c;
+    }
+
+    function pctBr(v, total) { return (total ? (v / total) * 100 : 0).toFixed(1).replace('.', ',') + '%'; }
+
+    function toggleDashboard() {
+      if (flowMode !== 'integral') return;
+      if (!dashboardOpen && !hasSearched) return showToast('Clique em "Buscar Dados" antes de abrir o DashBoard.', 'warn');
+      setDashboardView(!dashboardOpen);
+    }
+
+    function setDashboardView(on) {
+      dashboardOpen = on;
+      document.getElementById('table-panel').classList.toggle('hidden', on);
+      document.getElementById('dashboard-view').classList.toggle('hidden', !on);
+      document.getElementById('btn-dashboard').classList.toggle('is-on', on);
+      document.getElementById('dash-ico').className = on ? 'fa-solid fa-table-list' : 'fa-solid fa-chart-pie';
+      document.getElementById('dash-label').textContent = on ? 'Tabela' : 'DashBoard';
+      renderTableInfo(getFilteredConsultaData());
+      if (on) renderDashboard(); else destroyDashCharts();
+    }
+
+    function destroyDashCharts() {
+      Object.keys(dashCharts).forEach(k => { if (dashCharts[k]) { dashCharts[k].destroy(); dashCharts[k] = null; } });
+    }
+
+    function renderDashboard() {
+      if (!hasSearched) { setDashboardView(false); return; }
+      destroyDashCharts();
+
+      const per = getComparisonPeriods();
+      const cur = getDateFilteredData();
+      const prev = filterByRange(per.prevStart, per.prevEnd);
+      const cCur = countByStatus(cur);
+      const cPrev = countByStatus(prev);
+
+      // "SEM STATUS" só aparece quando existir
+      const labels = DASH_STATUSES.slice();
+      if (cCur['SEM STATUS'] > 0 || cPrev['SEM STATUS'] > 0) labels.push('SEM STATUS');
+
+      const totCur = cur.length, totPrev = prev.length;
+      const perTxt = `${fmtDateBr(per.start)} a ${fmtDateBr(per.end)}`;
+      const prevTxt = `${fmtDateBr(per.prevStart)} a ${fmtDateBr(per.prevEnd)}`;
+
+      document.getElementById('dash-period-info').textContent =
+        `Período consultado: ${perTxt} (${per.days} dia${per.days > 1 ? 's' : ''}) · Comparado com: ${prevTxt}`;
+      document.getElementById('bar-sub').textContent = `${totCur} ocorrência(s) · ${perTxt}`;
+      document.getElementById('pie-sub').textContent = totCur ? `Distribuição de ${totCur} ocorrência(s)` : 'Sem registros no período';
+      document.getElementById('cmp-sub').textContent = `${perTxt}  x  ${prevTxt} (mesmo intervalo de ${per.days} dia${per.days > 1 ? 's' : ''})`;
+
+      let varChip = '';
+      if (totPrev > 0) {
+        const d = ((totCur - totPrev) / totPrev) * 100;
+        const up = d > 0, same = d === 0;
+        const col = same ? '148,163,184' : (up ? '251,113,133' : '52,211,153');
+        const ico = same ? 'fa-equals' : (up ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down');
+        varChip = `<span class="nc-chip" style="--c:${col}"><i class="fa-solid ${ico}"></i>${(up ? '+' : '') + d.toFixed(1).replace('.', ',')}%</span>`;
+      }
+      document.getElementById('cmp-chips').innerHTML =
+        `<span class="nc-chip" style="--c:34,211,238">Atual: ${totCur}</span>` +
+        `<span class="nc-chip" style="--c:232,121,249">Mês anterior: ${totPrev}</span>` + varChip;
+
+      const AX = '#9fb0d0', AXL = '#c4d0ea', GRID = 'rgba(148,163,184,.12)';
+      const tip = { backgroundColor: 'rgba(8,12,26,.96)', titleColor: '#fff', bodyColor: '#c4d0ea', borderColor: 'rgba(34,211,238,.6)', borderWidth: 1, padding: 10, boxPadding: 4 };
+      const scales = (maxV) => ({
+        y: { beginAtZero: true, grid: { color: GRID }, border: { display: false }, ticks: { color: AX, precision: 0 }, suggestedMax: Math.max(maxV, 1) * 1.18 },
+        x: { grid: { display: false }, border: { color: 'rgba(148,163,184,.25)' }, ticks: { color: AXL, font: { size: 11, weight: '600' } } }
+      });
+      const dl = (color) => ({ color, anchor: 'end', align: 'end', offset: 2, font: { weight: 'bold', size: 11 }, formatter: v => v > 0 ? v : '', textShadowBlur: 6, textShadowColor: 'rgba(0,0,0,.9)' });
+
+      // 1) Barras: todos os status
+      const barVals = labels.map(l => cCur[l]);
+      dashCharts.bar = new Chart(document.getElementById('dashBarCanvas').getContext('2d'), {
+        type: 'bar',
+        plugins: [neonGlow],
+        data: {
+          labels,
+          datasets: [{
+            label: 'Ocorrências', data: barVals,
+            backgroundColor: labels.map(l => hexA(NEON[l], .5)),
+            borderColor: labels.map(l => NEON[l]),
+            borderWidth: 2, borderRadius: 8, borderSkipped: false, maxBarThickness: 54
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: { top: 18 } },
+          plugins: { legend: { display: false }, tooltip: { ...tip, displayColors: false, callbacks: { label: c => `Ocorrências: ${c.formattedValue} (${pctBr(c.parsed.y, totCur)})` } }, datalabels: dl('#ffffff') },
+          scales: scales(Math.max(...barVals))
+        }
+      });
+
+      // 2) Comparação: período consultado x mesmo intervalo do mês anterior
+      const cmpMax = Math.max(...labels.map(l => cCur[l]), ...labels.map(l => cPrev[l]));
+      dashCharts.cmp = new Chart(document.getElementById('dashCompareCanvas').getContext('2d'), {
+        type: 'bar',
+        plugins: [neonGlow],
+        data: {
+          labels,
+          datasets: [
+            { label: `Período atual (${perTxt})`, data: labels.map(l => cCur[l]), backgroundColor: 'rgba(34,211,238,.5)', borderColor: '#22d3ee', borderWidth: 2, borderRadius: 7, borderSkipped: false, maxBarThickness: 42, datalabels: dl('#a5f3fc') },
+            { label: `Mês anterior (${prevTxt})`, data: labels.map(l => cPrev[l]), backgroundColor: 'rgba(232,121,249,.45)', borderColor: '#e879f9', borderWidth: 2, borderRadius: 7, borderSkipped: false, maxBarThickness: 42, datalabels: dl('#f5d0fe') }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: { top: 18 } },
+          plugins: {
+            legend: { position: 'top', labels: { color: AXL, usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, padding: 16, font: { size: 11, weight: '600' } } },
+            tooltip: { ...tip, callbacks: { label: c => `${c.dataset.label.split(' (')[0]}: ${c.formattedValue}` } }
+          },
+          scales: scales(cmpMax)
+        }
+      });
+
+      // 3) Pizza: percentual de cada status
+      const pieLabels = labels.filter(l => cCur[l] > 0);
+      dashCharts.pie = new Chart(document.getElementById('dashPieCanvas').getContext('2d'), {
+        type: 'pie',
+        plugins: [neonGlow],
+        data: {
+          labels: pieLabels,
+          datasets: [{
+            data: pieLabels.map(l => cCur[l]),
+            backgroundColor: pieLabels.map(l => hexA(NEON[l], .55)),
+            borderColor: pieLabels.map(l => NEON[l]),
+            borderWidth: 2, hoverOffset: 10
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: 14 },
+          plugins: {
+            legend: { position: 'right', labels: { color: AXL, usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, padding: 14, font: { size: 11, weight: '600' } } },
+            tooltip: { ...tip, callbacks: { label: c => `${c.label}: ${c.parsed} (${pctBr(c.parsed, totCur)})` } },
+            datalabels: {
+              color: '#ffffff', font: { weight: 'bold', size: 12 }, textShadowBlur: 6, textShadowColor: 'rgba(0,0,0,.9)',
+              display: c => totCur > 0 && (c.dataset.data[c.dataIndex] / totCur) >= 0.03,
+              formatter: v => pctBr(v, totCur)
+            }
+          }
+        }
+      });
+    }
+
     /* ================== ATUALIZAÇÃO ================== */
     function checkNfInPeriod() {
       const nfInput = document.getElementById('upd-nf-input').value.trim();
@@ -1544,35 +1959,38 @@
       setSaving(false);
     }
 
+    function onBulkStatusChange() {
+      const st = document.getElementById('upd-bulk-status').value;
+      document.getElementById('bulk-btn-label').textContent = st ? `Atualizar p/ "${st}"` : 'Atualizar período';
+    }
+
     async function executeBulkUpdate() {
       const pStart = document.getElementById('upd-period-start').value;
       const pEnd = document.getElementById('upd-period-end').value;
+      const newStatus = document.getElementById('upd-bulk-status').value;
 
       if (!pStart || !pEnd) return showToast('Informe a Data Inicial e a Data Final do período.', 'error');
       if (pStart > pEnd) return showToast('A Data Inicial não pode ser maior que a Data Final.', 'error');
+      if (!newStatus) return showToast('Escolha o status que será aplicado ao período.', 'error');
 
-      const targets = rawData.filter(item => {
-        let itemDateStr = item.data.split('/').reverse().join('-');
-        if (item.data.includes('-')) itemDateStr = item.data;
-        return itemDateStr >= pStart && itemDateStr <= pEnd;
-      });
+      const targets = filterByRange(pStart, pEnd);
 
       if (targets.length === 0) return showToast('Nenhum registro encontrado no período.', 'error');
-      if (!confirm(`Atualizar ${targets.length} ocorrência(s) do período selecionado para "ENVIADO"?`)) return;
+      if (!confirm(`Atualizar ${targets.length} ocorrência(s) do período selecionado para "${newStatus}"?`)) return;
 
       showLoading(true);
       try {
         const BATCH = 200;
         for (let i = 0; i < targets.length; i += BATCH) {
-          const chunk = targets.slice(i, i + BATCH).map(it => ({ row: it.rowIndex, status: 'ENVIADO', colStatus: 'J' }));
+          const chunk = targets.slice(i, i + BATCH).map(it => ({ row: it.rowIndex, status: newStatus, colStatus: 'J' }));
           await persistUpdates(chunk);
         }
 
-        targets.forEach(it => { it.statusManual = 'ENVIADO'; });
+        targets.forEach(it => { it.statusManual = newStatus; });
 
         // Relê a planilha para refletir exatamente o que foi gravado
         await loadRealData(true);
-        showToast(`${targets.length} registros gravados na planilha!`, 'success');
+        showToast(`${targets.length} registros gravados na planilha como "${newStatus}"!`, 'success');
       } catch (err) {
         showToast('Erro ao gravar: ' + err.message, 'error');
       }
