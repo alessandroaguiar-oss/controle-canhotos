@@ -919,6 +919,11 @@
     const API_KEY = "AIzaSyBwvNC2bf6Ix8atG07BhzcvxhlnhyiPgv4";
     const SHEET_ID = "1o4_kUnBmgnbYFbsf6Zv2_0m_iUpPHNT6Vk3xNCEc0xE";
     const RANGE = "Controle de Canhotos!A2:L";
+    // Origem dos CARDS: aba "Base Final" (a tabela continua vindo de "Controle de Canhotos").
+    // Ajuste os índices das colunas (0 = A, 1 = B, ...) se o layout da "Base Final" for diferente.
+    const RANGE_CARDS = "Base Final!A2:L";
+    const CARDS_COL = { data: 0, statusAuto: 10 };   // A = Data | K = Status Automático
+    let cardsData = null;                             // null = ainda não carregado / falhou
     // Cole aqui a URL do Web App (termina em /exec). Veja o passo a passo no início deste arquivo.
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzr2TNc9FwgOYHD5ZRM7yWF7rJ963PHFwQpR0MyePDSHfivMM6F0p-3t-TwOlierQ6q/exec";
 
@@ -1069,6 +1074,7 @@
         const response = await fetch(url);
         const result = await response.json();
         if (result.error) throw new Error(result.error.message);
+        await loadCardsData();
         if (result.values) {
           updatePendingSummary(result.values);
           const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
@@ -1108,6 +1114,23 @@
         showToast('Erro de API: ' + err.message, 'error');
       }
       showLoading(false);
+    }
+
+    // Lê a aba "Base Final" (usada somente pelos cards)
+    async function loadCardsData() {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE_CARDS)}?key=${API_KEY}`;
+      const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
+      try {
+        const r = await (await fetch(url)).json();
+        if (r.error) throw new Error(r.error.message);
+        cardsData = (r.values || []).map(row => ({
+          data: String(row[CARDS_COL.data] || '').trim(),
+          statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase()
+        })).filter(item => (item.data || item.statusAuto) && allowedStatus.includes(item.statusAuto));
+      } catch (err) {
+        cardsData = null;
+        showToast('Erro ao ler a aba "Base Final": ' + err.message, 'error');
+      }
     }
 
     function showLoading(state) {
@@ -1310,8 +1333,8 @@
       return ts === null ? null : new Date(ts).toISOString().slice(0, 10);
     }
 
-    function filterByRange(start, end) {
-      return rawData.filter(item => {
+    function filterByRange(start, end, source = rawData) {
+      return source.filter(item => {
         const iso = itemIso(item);
         if (start && (!iso || iso < start)) return false;
         if (end && (!iso || iso > end)) return false;
@@ -1323,6 +1346,12 @@
     function getDateFilteredData() {
       if (!hasSearched) return [];
       return filterByRange(activeFilters.start, activeFilters.end);
+    }
+
+    // Dados dos cards: aba "Base Final" no período consultado (null = mostra "—")
+    function getCardsData() {
+      if (!hasSearched || !cardsData) return null;
+      return filterByRange(activeFilters.start, activeFilters.end, cardsData);
     }
 
     function matchesStatus(item, key) {
@@ -1345,7 +1374,7 @@
       const data = getFilteredConsultaData();
       const tbody = document.getElementById('table-body');
 
-      renderDashboardCards(hasSearched ? getDateFilteredData() : null);
+      renderDashboardCards(getCardsData());
       renderTableInfo(data);
       if (dashboardOpen) renderDashboard();
 
