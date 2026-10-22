@@ -924,6 +924,9 @@
     const RANGE_CARDS = "Base Final!A2:L";
     const CARDS_COL = { data: 0, statusAuto: 10 };   // A = Data | K = Status Automático
     let cardsData = null;                             // null = ainda não carregado / falhou
+    // Card "TOTAL SEM ASSINATURA" e letreiro: aba "Controle de Canhotos" (colunas A = Data | K = Status Automático)
+    const CONTROLE_COL = { data: 0, statusAuto: 10 };
+    let controleData = [];
     // Cole aqui a URL do Web App (termina em /exec). Veja o passo a passo no início deste arquivo.
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzr2TNc9FwgOYHD5ZRM7yWF7rJ963PHFwQpR0MyePDSHfivMM6F0p-3t-TwOlierQ6q/exec";
 
@@ -1074,7 +1077,14 @@
         const response = await fetch(url);
         const result = await response.json();
         if (result.error) throw new Error(result.error.message);
-        await loadCardsData();
+        await loadCardsData();   // aba "Base Final" (demais cards)
+        // aba "Controle de Canhotos" (card TOTAL SEM ASSINATURA + letreiro): toda linha com algum dado
+        controleData = (result.values || [])
+          .filter(row => row.some(cell => String(cell || '').trim() !== ''))
+          .map(row => ({
+            data: String(row[CONTROLE_COL.data] || '').trim(),
+            statusAuto: String(row[CONTROLE_COL.statusAuto] || '').trim().toUpperCase()
+          }));
         if (result.values) {
           updatePendingSummary(result.values);
           const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
@@ -1116,20 +1126,22 @@
       showLoading(false);
     }
 
-    // Lê a aba "Base Final" (usada somente pelos cards)
+    // Lê a aba "Base Final" (origem dos cards, exceto "TOTAL SEM ASSINATURA"). Retorna as linhas brutas ou null se falhar.
     async function loadCardsData() {
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE_CARDS)}?key=${API_KEY}`;
-      const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
       try {
         const r = await (await fetch(url)).json();
         if (r.error) throw new Error(r.error.message);
-        cardsData = (r.values || []).map(row => ({
+        const rows = (r.values || []).filter(row => row.some(cell => String(cell || '').trim() !== ''));
+        cardsData = rows.map(row => ({
           data: String(row[CARDS_COL.data] || '').trim(),
           statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase()
-        })).filter(item => (item.data || item.statusAuto) && allowedStatus.includes(item.statusAuto));
+        }));
+        return rows;
       } catch (err) {
         cardsData = null;
         showToast('Erro ao ler a aba "Base Final": ' + err.message, 'error');
+        return null;
       }
     }
 
@@ -1172,13 +1184,13 @@
         const hasData = row.some(cell => String(cell || '').trim() !== '');
         if (!hasData) return;
 
-        const st = String(row[10] || '').trim().toUpperCase(); // Coluna K
+        const st = String(row[CONTROLE_COL.statusAuto] || '').trim().toUpperCase(); // Coluna K
         
         // PENDENTES = tudo diferente de RESOLVIDO (incluindo campos vazios "")
         if (st === 'RESOLVIDO') return;
         pending++;
 
-        const ts = parseSheetDate(row[0]); // Coluna A
+        const ts = parseSheetDate(row[CONTROLE_COL.data]); // Coluna A
         if (ts === null) return;
         const days = Math.round((todayUTC - ts) / 86400000);
         if (days > 7) over7++;
@@ -1348,10 +1360,14 @@
       return filterByRange(activeFilters.start, activeFilters.end);
     }
 
-    // Dados dos cards: aba "Base Final" no período consultado (null = mostra "—")
+    // Dados dos cards no período consultado (critério de data obedecido nas duas origens):
+    //  base = aba "Base Final" (todos os cards, exceto o abaixo) | sem = aba "Controle de Canhotos" (TOTAL SEM ASSINATURA)
     function getCardsData() {
-      if (!hasSearched || !cardsData) return null;
-      return filterByRange(activeFilters.start, activeFilters.end, cardsData);
+      if (!hasSearched) return { base: null, sem: null };
+      return {
+        base: cardsData ? filterByRange(activeFilters.start, activeFilters.end, cardsData) : null,
+        sem: filterByRange(activeFilters.start, activeFilters.end, controleData)
+      };
     }
 
     function matchesStatus(item, key) {
@@ -1374,7 +1390,8 @@
       const data = getFilteredConsultaData();
       const tbody = document.getElementById('table-body');
 
-      renderDashboardCards(getCardsData());
+      const cd = getCardsData();
+      renderDashboardCards(cd.base, cd.sem);
       renderTableInfo(data);
       if (dashboardOpen) renderDashboard();
 
@@ -1417,14 +1434,15 @@
       el.classList.remove('hidden');
     }
 
-    function renderDashboardCards(list) {
+    function renderDashboardCards(baseList, semList) {
       const grid = document.getElementById('dashboard-cards');
       const keys = FLOW_MODES[flowMode].cards;
       grid.classList.toggle('compact', flowMode === 'integral');
 
       grid.innerHTML = keys.map(key => {
         const meta = CARD_META[key] || { label: key, icon: statusIcons[key] || 'fa-folder' };
-        const total = list ? list.filter(item => matchesStatus(item, key)).length : '—';
+        const src = key === 'SEM_ASSINATURA' ? semList : baseList;
+        const total = src ? src.filter(item => matchesStatus(item, key)).length : '—';
         const sel = hasSearched && activeFilters.status === key;
         return `
         <div class="metal clickable m-${key} ${sel ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${sel}"
