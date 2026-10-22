@@ -387,6 +387,13 @@
     .seg { display: flex; gap: .25rem; padding: .25rem; border-radius: .8rem; background: var(--input-bg); border: 1px solid var(--border); }
     .seg-btn { padding: .4rem .8rem; border-radius: .6rem; font-size: .72rem; font-weight: 800; color: var(--muted); cursor: pointer; transition: all .2s; border: 1px solid transparent; }
     .seg-btn:hover { color: var(--text); }
+    .top5-row { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+    .top5-row:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px var(--accent, #818cf8); }
+    .top5-row:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+    .company-sw { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; }
+    .company-title { font-size: .55rem; font-weight: 800; letter-spacing: .16em; color: var(--muted); line-height: 1; }
+    .company-sw .seg { padding: .15rem; gap: .15rem; border-radius: .65rem; }
+    .company-sw .seg-btn { padding: .25rem .65rem; font-size: .62rem; border-radius: .5rem; white-space: nowrap; }
     .seg-btn.active { color: #fff; background: linear-gradient(160deg, #818cf8, #4f46e5); box-shadow: 0 0 12px rgba(99,102,241,.6); }
 
     .bar-track { width: 100%; height: .5rem; border-radius: 999px; overflow: hidden; background: var(--surface-3); }
@@ -530,7 +537,7 @@
       }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       html, body { height: auto !important; width: auto !important; overflow: visible !important; display: block !important; background: #fff !important; color: #000 !important; }
-      .sidebar, .app-header, #login-screen, #toast, #top5-modal, #view-atualizacao, #mode-row, #cards-row, #filters-panel, #table-info, #dashboard-view { display: none !important; }
+      .sidebar, .app-header, #login-screen, #toast, #top5-modal, #view-atualizacao, #mode-row, #cards-row, #filters-panel, #table-info, #dashboard-view, #client-modal { display: none !important; }
       main, #main-scroll { display: block !important; height: auto !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; }
       #view-consulta > * { margin-top: 0 !important; }
       .print-only { display: block !important; margin-bottom: 4mm; color: #000; }
@@ -675,6 +682,14 @@
         </h2>
       </div>
       <div class="flex items-center space-x-5 shrink-0">
+        <div class="company-sw">
+          <span class="company-title">SELECIONE A EMPRESA</span>
+          <div class="seg" role="group" aria-label="Selecione a empresa">
+            <button id="btn-emp-andrade" onclick="setCompany('andrade')" class="seg-btn">ANDRADE</button>
+            <button id="btn-emp-meta" onclick="setCompany('meta')" class="seg-btn">META</button>
+            <button id="btn-emp-todas" onclick="setCompany('todas')" class="seg-btn active">TODAS AS EMPRESAS</button>
+          </div>
+        </div>
         <div id="loading-indicator" class="hidden flex items-center space-x-2 t-accent text-xs font-semibold">
           <i class="fa-solid fa-circle-notch fa-spin"></i><span>Sincronizando com Planilha...</span>
         </div>
@@ -913,6 +928,39 @@
     </div>
   </div>
 
+  <!-- MODAL: OCORRÊNCIAS DO CLIENTE (aberto a partir do Top 5) -->
+  <div id="client-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(10,15,30,.65); backdrop-filter: blur(6px);" onclick="if(event.target===this)closeClientModal()">
+    <div class="panel w-full p-6 space-y-4" style="max-width:min(96vw, 90rem)">
+      <div class="flex items-center justify-between pb-4 gap-4 flex-wrap" style="border-bottom:1px solid var(--border)">
+        <div class="flex items-center space-x-3 min-w-0">
+          <div class="brand-icon" style="width:2.5rem;height:2.5rem;border-radius:.75rem;--x:0">
+            <i class="fa-solid fa-user-tag"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 id="client-modal-title" class="font-extrabold text-lg truncate"></h3>
+            <p id="client-modal-sub" class="text-xs t-muted"></p>
+          </div>
+        </div>
+        <span id="client-modal-count" class="badge st-ENVIADO font-mono"></span>
+      </div>
+      <div class="tbl-wrap" style="max-height:60vh; overflow:auto">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Data</th><th>Filial</th><th>Nº Carga</th><th>Nº NF</th><th>Cód. Cliente</th>
+              <th>Razão Social</th><th>Motorista</th><th>Município/Bairro</th><th>Rota Principal</th>
+              <th>Status Manual</th><th>Status Auto</th><th>Observação</th>
+            </tr>
+          </thead>
+          <tbody id="client-modal-body" class="font-mono"></tbody>
+        </table>
+      </div>
+      <div class="pt-4 text-right" style="border-top:1px solid var(--border)">
+        <button onclick="closeClientModal()" class="btn"><i class="fa-solid fa-xmark"></i> Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     Chart.register(ChartDataLabels);
 
@@ -922,11 +970,30 @@
     // Origem dos CARDS: aba "Base Final" (a tabela continua vindo de "Controle de Canhotos").
     // Ajuste os índices das colunas (0 = A, 1 = B, ...) se o layout da "Base Final" for diferente.
     const RANGE_CARDS = "Base Final!A2:L";
-    const CARDS_COL = { data: 0, statusAuto: 10 };   // A = Data | K = Status Automático
+    const CARDS_COL = { data: 0, filial: 1, statusAuto: 10 };   // A = Data | B = Filial/Empresa | K = Status Automático
     let cardsData = null;                             // null = ainda não carregado / falhou
     // Card "TOTAL SEM ASSINATURA" e letreiro: aba "Controle de Canhotos" (colunas A = Data | K = Status Automático)
-    const CONTROLE_COL = { data: 0, statusAuto: 10 };
+    const CONTROLE_COL = { data: 0, filial: 1, statusAuto: 10 };
     let controleData = [];
+    let controleValues = [];   // linhas brutas da aba "Controle de Canhotos" (usadas pelo letreiro)
+
+    // Seletor de empresa — filtra pela coluna B (Filial): ANDRADE = "1" | META = "F1" | TODAS = sem filtro
+    let company = 'todas';
+    const COMPANIES = {
+      andrade: { label: 'ANDRADE',           code: '1'  },
+      meta:    { label: 'META',              code: 'F1' },
+      todas:   { label: 'TODAS AS EMPRESAS', code: null }
+    };
+    function matchesCompany(filial) {
+      const code = COMPANIES[company].code;
+      return code === null || String(filial || '').trim().toUpperCase() === code;
+    }
+    function setCompany(key) {
+      company = key;
+      Object.keys(COMPANIES).forEach(k => document.getElementById('btn-emp-' + k).classList.toggle('active', k === key));
+      updatePendingSummary(controleValues);   // letreiro
+      renderConsultaTable();                  // cards, tabela e dashboard
+    }
     // Cole aqui a URL do Web App (termina em /exec). Veja o passo a passo no início deste arquivo.
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzr2TNc9FwgOYHD5ZRM7yWF7rJ963PHFwQpR0MyePDSHfivMM6F0p-3t-TwOlierQ6q/exec";
 
@@ -961,7 +1028,12 @@
       const marqueeTrack = document.getElementById('marquee-track');
       marqueeTrack.addEventListener('animationend', stepMarqueeMessage);
 
-      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeTop5Modal(); });
+      document.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Escape') return;
+        // Esc fecha primeiro a janela do cliente; se não houver, fecha o Top 5
+        if (!document.getElementById('client-modal').classList.contains('hidden')) closeClientModal();
+        else closeTop5Modal();
+      });
       document.getElementById('login-user').addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter') {
           ev.preventDefault();
@@ -1083,8 +1155,10 @@
           .filter(row => row.some(cell => String(cell || '').trim() !== ''))
           .map(row => ({
             data: String(row[CONTROLE_COL.data] || '').trim(),
+            filial: String(row[CONTROLE_COL.filial] || '').trim(),
             statusAuto: String(row[CONTROLE_COL.statusAuto] || '').trim().toUpperCase()
           }));
+        controleValues = result.values || [];
         if (result.values) {
           updatePendingSummary(result.values);
           const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
@@ -1135,6 +1209,7 @@
         const rows = (r.values || []).filter(row => row.some(cell => String(cell || '').trim() !== ''));
         cardsData = rows.map(row => ({
           data: String(row[CARDS_COL.data] || '').trim(),
+          filial: String(row[CARDS_COL.filial] || '').trim(),
           statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase()
         }));
         return rows;
@@ -1183,6 +1258,7 @@
         // Ignora linhas totalmente vazias da planilha
         const hasData = row.some(cell => String(cell || '').trim() !== '');
         if (!hasData) return;
+        if (!matchesCompany(row[CONTROLE_COL.filial])) return;   // empresa selecionada
 
         const st = String(row[CONTROLE_COL.statusAuto] || '').trim().toUpperCase(); // Coluna K
         
@@ -1199,16 +1275,17 @@
       });
 
       marqueeMessages = [];
+      const emp = company === 'todas' ? '' : `<strong>${COMPANIES[company].label}</strong> · `;
       if (pending === 0) {
-        marqueeMessages.push('<i class="fa-solid fa-circle-check mq-ok"></i> <span class="mq-ok">Nenhuma nota pendente de assinatura!</span>');
+        marqueeMessages.push('<i class="fa-solid fa-circle-check mq-ok"></i> ' + emp + '<span class="mq-ok">Nenhuma nota pendente de assinatura!</span>');
       } else {
-        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> Notas pendentes de assinatura: <strong class="mq-warn">${pending}</strong>`);
-        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> Pendentes com mais de 7 dias: <strong class="mq-danger">${over7}</strong>`);
+        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Notas pendentes de assinatura: <strong class="mq-warn">${pending}</strong>`);
+        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Pendentes com mais de 7 dias: <strong class="mq-danger">${over7}</strong>`);
         if (oldestTs !== null) {
           const oldDays = Math.max(0, Math.round((todayUTC - oldestTs) / 86400000));
           const dayTxt = oldDays === 0 ? 'hoje' : (oldDays === 1 ? 'há 1 dia' : `há ${oldDays} dias`);
           const pl = oldestCount > 1;
-          marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> Data mais antiga: <strong class="mq-danger">${oldestCount}</strong> ${pl ? 'notas pendentes' : 'nota pendente'} (${dayTxt})`);
+          marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Data mais antiga: <strong class="mq-danger">${oldestCount}</strong> ${pl ? 'notas pendentes' : 'nota pendente'} (${dayTxt})`);
         }
       }
       
@@ -1347,6 +1424,7 @@
 
     function filterByRange(start, end, source = rawData) {
       return source.filter(item => {
+        if (!matchesCompany(item.filial)) return false;
         const iso = itemIso(item);
         if (start && (!iso || iso < start)) return false;
         if (end && (!iso || iso > end)) return false;
@@ -1404,7 +1482,12 @@
         return;
       }
 
-      tbody.innerHTML = data.map(item => `
+      tbody.innerHTML = data.map(rowHtml).join('');
+    }
+
+    // Linha da tabela (usada na tabela principal e na janela de ocorrências do cliente)
+    function rowHtml(item) {
+      return `
         <tr>
           <td>${item.data || '-'}</td>
           <td>${item.filial}</td>
@@ -1418,8 +1501,7 @@
           <td>${renderStatusBadge(item.statusManual)}</td>
           <td>${renderStatusBadge(item.statusAuto)}</td>
           <td class="font-sans t-muted max-w-xs truncate">${item.observacao || '-'}</td>
-        </tr>
-      `).join('');
+        </tr>`;
     }
 
     function renderTableInfo(data) {
@@ -1495,6 +1577,8 @@
     }
 
     /* ================== GRÁFICO NEON TOP 5 ================== */
+    let top5Sorted = [];
+
     function openTop5Modal(showModal = true) {
       if (showModal && !hasSearched) return showToast('Clique em "Buscar Dados" antes de abrir a análise.', 'warn');
       const data = getFilteredConsultaData();
@@ -1507,6 +1591,7 @@
       });
 
       const sorted = Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 5);
+      top5Sorted = sorted;
       const listContainer = document.getElementById('top5-list-container');
       if (sorted.length === 0) {
         listContainer.innerHTML = '<p class="text-center text-sm py-4 t-muted">Nenhum dado encontrado no período.</p>';
@@ -1515,7 +1600,8 @@
         listContainer.innerHTML = sorted.map((item, index) => {
           const percent = Math.round((item.count / maxCount) * 100);
           return `
-            <div class="inset p-3.5 space-y-2">
+            <div class="inset p-3.5 space-y-2 top5-row" role="button" tabindex="0" title="Clique para ver todas as ocorrências deste cliente"
+                 onclick="openClientModal(${index})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openClientModal(${index})}">
               <div class="flex items-center justify-between text-xs">
                 <span class="font-bold">#${index + 1} - ${item.razao} <span class="font-mono t-accent">(${item.cod})</span></span>
                 <span class="badge st-ENVIADO font-mono">${item.count} ocorrências</span>
@@ -1579,6 +1665,8 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          onClick: (evt, els) => { if (els.length) openClientModal(els[0].index); },
+          onHover: (evt, els) => { if (evt.native) evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -1642,6 +1730,24 @@
 
     function closeTop5Modal() {
       document.getElementById('top5-modal').classList.add('hidden');
+    }
+
+    // Janela com todas as ocorrências do cliente clicado (mesmos filtros do Top 5, então a contagem confere)
+    function openClientModal(index) {
+      const client = top5Sorted[index];
+      if (!client) return;
+      const rows = getFilteredConsultaData().filter(item => (item.codCliente || 'N/D') === client.cod);
+      document.getElementById('client-modal-title').textContent = client.razao;
+      document.getElementById('client-modal-sub').textContent = `Cód. ${client.cod} · ocorrências nos filtros atuais`;
+      document.getElementById('client-modal-count').textContent = `${rows.length} ocorrência${rows.length === 1 ? '' : 's'}`;
+      document.getElementById('client-modal-body').innerHTML = rows.length
+        ? rows.map(rowHtml).join('')
+        : '<tr><td colspan="12" class="p-8 text-center t-muted italic">Nenhuma ocorrência encontrada.</td></tr>';
+      document.getElementById('client-modal').classList.remove('hidden');
+    }
+
+    function closeClientModal() {
+      document.getElementById('client-modal').classList.add('hidden');
     }
 
     /* ================== DASHBOARD NEON (FLUXO INTEGRAL) ================== */
@@ -1713,7 +1819,7 @@
 
     // Período consultado e o período equivalente do mês anterior (mesma quantidade de dias)
     function getComparisonPeriods() {
-      const isos = rawData.map(itemIso).filter(Boolean).sort();
+      const isos = rawData.filter(i => matchesCompany(i.filial)).map(itemIso).filter(Boolean).sort();
       const n = new Date();
       const todayIso = utcToIso(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()));
       const start = activeFilters.start || isos[0] || todayIso;
@@ -2023,7 +2129,7 @@
       const targets = filterByRange(pStart, pEnd);
 
       if (targets.length === 0) return showToast('Nenhum registro encontrado no período.', 'error');
-      if (!confirm(`Atualizar ${targets.length} ocorrência(s) do período selecionado para "${newStatus}"?`)) return;
+      if (!confirm(`Atualizar ${targets.length} ocorrência(s) do período selecionado${company === 'todas' ? '' : ' (empresa ' + COMPANIES[company].label + ')'} para "${newStatus}"?`)) return;
 
       showLoading(true);
       try {
