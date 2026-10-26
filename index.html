@@ -970,12 +970,16 @@
     // Origem dos CARDS: aba "Base Final" (a tabela continua vindo de "Controle de Canhotos").
     // Ajuste os índices das colunas (0 = A, 1 = B, ...) se o layout da "Base Final" for diferente.
     const RANGE_CARDS = "Base Final!A2:L";
-    const CARDS_COL = { data: 0, filial: 1, statusAuto: 10 };   // A = Data | B = Filial/Empresa | K = Status Automático
+    // Layout da "Base Final" (0 = A, 1 = B, ...): B = Filial/Empresa | D = Nº da Nota | J = Status | K = Observação | L = Data
+    const CARDS_COL = { data: 11, filial: 1, nf: 3, statusAuto: 9 };
+    // Letreiro: uma nota que tenha QUALQUER linha com status RESOLVIDO é considerada resolvida (não entra nas pendentes).
+    // Troque para false para considerar pendente toda nota que tenha ao menos uma linha diferente de RESOLVIDO.
+    const NOTA_RESOLVIDA_EM_QUALQUER_LINHA = true;
     let cardsData = null;                             // null = ainda não carregado / falhou
     // Card "TOTAL SEM ASSINATURA" e letreiro: aba "Controle de Canhotos" (colunas A = Data | K = Status Automático)
     const CONTROLE_COL = { data: 0, filial: 1, statusAuto: 10 };
     let controleData = [];
-    let controleValues = [];   // linhas brutas da aba "Controle de Canhotos" (usadas pelo letreiro)
+    let baseFinalRows = null;  // linhas brutas da aba "Base Final" (usadas pelo letreiro); null = indisponível
 
     // Seletor de empresa — filtra pela coluna B (Filial): ANDRADE = "1" | META = "F1" | TODAS = sem filtro
     let company = 'todas';
@@ -991,7 +995,7 @@
     function setCompany(key) {
       company = key;
       Object.keys(COMPANIES).forEach(k => document.getElementById('btn-emp-' + k).classList.toggle('active', k === key));
-      updatePendingSummary(controleValues);   // letreiro
+      updatePendingSummary(baseFinalRows);   // letreiro
       renderConsultaTable();                  // cards, tabela e dashboard
     }
     // Cole aqui a URL do Web App (termina em /exec). Veja o passo a passo no início deste arquivo.
@@ -1149,7 +1153,7 @@
         const response = await fetch(url);
         const result = await response.json();
         if (result.error) throw new Error(result.error.message);
-        await loadCardsData();   // aba "Base Final" (demais cards)
+        baseFinalRows = await loadCardsData();   // aba "Base Final" (demais cards + letreiro)
         // aba "Controle de Canhotos" (card TOTAL SEM ASSINATURA + letreiro): toda linha com algum dado
         controleData = (result.values || [])
           .filter(row => row.some(cell => String(cell || '').trim() !== ''))
@@ -1158,9 +1162,8 @@
             filial: String(row[CONTROLE_COL.filial] || '').trim(),
             statusAuto: String(row[CONTROLE_COL.statusAuto] || '').trim().toUpperCase()
           }));
-        controleValues = result.values || [];
         if (result.values) {
-          updatePendingSummary(result.values);
+          updatePendingSummary(baseFinalRows);
           const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
           
           rawData = result.values.map((row, index) => {
@@ -1189,7 +1192,7 @@
           if (!silent) showToast('Dados da Planilha Sincronizados!', 'success');
         } else {
           rawData = [];
-          updatePendingSummary([]);
+          updatePendingSummary(baseFinalRows);
           renderConsultaTable();
         }
         setApiStatus('ok');
@@ -1249,33 +1252,51 @@
      * Considera como PENDENTE toda linha válida da planilha em que a Coluna K (statusAuto)
      * é DIFERENTE DE "RESOLVIDO", incluindo valores em branco ou vazios ("").
      */
-    function updatePendingSummary(values) {
-      const now = new Date();
-      const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-      let pending = 0, over7 = 0, oldestTs = null, oldestCount = 0;
-
-      values.forEach(row => {
-        // Ignora linhas totalmente vazias da planilha
-        const hasData = row.some(cell => String(cell || '').trim() !== '');
-        if (!hasData) return;
-        if (!matchesCompany(row[CONTROLE_COL.filial])) return;   // empresa selecionada
-
-        const st = String(row[CONTROLE_COL.statusAuto] || '').trim().toUpperCase(); // Coluna K
-        
-        // PENDENTES = tudo diferente de RESOLVIDO (incluindo campos vazios "")
-        if (st === 'RESOLVIDO') return;
-        pending++;
-
-        const ts = parseSheetDate(row[CONTROLE_COL.data]); // Coluna A
-        if (ts === null) return;
-        const days = Math.round((todayUTC - ts) / 86400000);
-        if (days > 7) over7++;
-        if (oldestTs === null || ts < oldestTs) { oldestTs = ts; oldestCount = 1; }
-        else if (ts === oldestTs) oldestCount++;
-      });
-
+    // Letreiro — calculado na aba "Base Final", por NOTA distinta (coluna D), sem filtro de data (só empresa):
+    //  • pendente = nota sem nenhuma linha RESOLVIDO (várias linhas da mesma nota contam uma única vez)
+    //  • mais de 7 dias / nota mais antiga = pela data da coluna L (menor data entre as linhas da nota)
+    function updatePendingSummary(rows) {
       marqueeMessages = [];
       const emp = company === 'todas' ? '' : `<strong>${COMPANIES[company].label}</strong> · `;
+
+      if (!rows) {
+        marqueeMessages.push('<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ' + emp + 'Aba "Base Final" indisponível — letreiro sem dados');
+        currentMarqueeIndex = 0;
+        startMarqueeAnimation();
+        return;
+      }
+
+      const now = new Date();
+      const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+      const notas = new Map();   // nº da nota -> { resolvida, ts (menor data entre as linhas não resolvidas) }
+
+      rows.forEach(row => {
+        if (!row.some(cell => String(cell || '').trim() !== '')) return;   // linha vazia
+        if (!matchesCompany(row[CARDS_COL.filial])) return;                // empresa selecionada
+        const nf = String(row[CARDS_COL.nf] || '').trim().toUpperCase();
+        if (!nf) return;                                                   // sem nº de nota não dá para identificar
+
+        const st = String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase();
+        let n = notas.get(nf);
+        if (!n) { n = { resolvida: false, pendente: false, ts: null }; notas.set(nf, n); }
+        if (st === 'RESOLVIDO') { n.resolvida = true; return; }
+
+        n.pendente = true;                                                 // qualquer status diferente de RESOLVIDO (inclui vazio)
+        const ts = parseSheetDate(row[CARDS_COL.data]);                    // Coluna L
+        if (ts !== null && (n.ts === null || ts < n.ts)) n.ts = ts;
+      });
+
+      let pending = 0, over7 = 0, oldestTs = null, oldestNfs = [];
+      notas.forEach((n, nf) => {
+        if (!n.pendente) return;
+        if (NOTA_RESOLVIDA_EM_QUALQUER_LINHA && n.resolvida) return;
+        pending++;
+        if (n.ts === null) return;
+        if (Math.round((todayUTC - n.ts) / 86400000) > 7) over7++;
+        if (oldestTs === null || n.ts < oldestTs) { oldestTs = n.ts; oldestNfs = [nf]; }
+        else if (n.ts === oldestTs) oldestNfs.push(nf);
+      });
+
       if (pending === 0) {
         marqueeMessages.push('<i class="fa-solid fa-circle-check mq-ok"></i> ' + emp + '<span class="mq-ok">Nenhuma nota pendente de assinatura!</span>');
       } else {
@@ -1284,11 +1305,14 @@
         if (oldestTs !== null) {
           const oldDays = Math.max(0, Math.round((todayUTC - oldestTs) / 86400000));
           const dayTxt = oldDays === 0 ? 'hoje' : (oldDays === 1 ? 'há 1 dia' : `há ${oldDays} dias`);
-          const pl = oldestCount > 1;
-          marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Data mais antiga: <strong class="mq-danger">${oldestCount}</strong> ${pl ? 'notas pendentes' : 'nota pendente'} (${dayTxt})`);
+          const dt = fmtDateBr(utcToIso(oldestTs));
+          const what = oldestNfs.length === 1
+            ? `NF <strong class="mq-danger">${oldestNfs[0]}</strong>`
+            : `<strong class="mq-danger">${oldestNfs.length}</strong> notas pendentes`;
+          marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Nota mais antiga: ${what} · ${dt} (${dayTxt})`);
         }
       }
-      
+
       currentMarqueeIndex = 0;
       startMarqueeAnimation();
     }
