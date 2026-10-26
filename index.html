@@ -537,7 +537,7 @@
       }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       html, body { height: auto !important; width: auto !important; overflow: visible !important; display: block !important; background: #fff !important; color: #000 !important; }
-      .sidebar, .app-header, #login-screen, #toast, #top5-modal, #view-atualizacao, #mode-row, #cards-row, #filters-panel, #table-info, #dashboard-view, #client-modal { display: none !important; }
+      .sidebar, .app-header, #login-screen, #toast, #top5-modal, #view-atualizacao, #mode-row, #cards-row, #filters-panel, #table-info, #dashboard-view, #client-modal, #nf-modal { display: none !important; }
       main, #main-scroll { display: block !important; height: auto !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; }
       #view-consulta > * { margin-top: 0 !important; }
       .print-only { display: block !important; margin-bottom: 4mm; color: #000; }
@@ -747,6 +747,16 @@
               <option value="SEM_ASSINATURA">TOTAL SEM ASSINATURA</option>
             </select>
           </div>
+          <div>
+            <label class="lbl">Nº da NF (movimentações)</label>
+            <div class="flex items-center gap-2">
+              <input type="text" id="filter-nf" class="field" style="width:9.5rem" placeholder="Ex.: 123456" autocomplete="off"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();searchNf()}">
+              <button onclick="searchNf()" class="neon-btn" style="--neon-rgb:244,114,182; padding:.6rem .9rem" title="Ver todas as movimentações da NF">
+                <i class="fa-solid fa-file-invoice"></i><span>Buscar NF</span>
+              </button>
+            </div>
+          </div>
           <button onclick="searchData()" class="neon-btn" style="--neon-rgb:52,211,153;">
             <i class="fa-solid fa-magnifying-glass"></i><span>Buscar Dados</span>
           </button>
@@ -928,6 +938,36 @@
     </div>
   </div>
 
+  <!-- MODAL: MOVIMENTAÇÕES DA NF (aba "Base Final") -->
+  <div id="nf-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(10,15,30,.65); backdrop-filter: blur(6px);" onclick="if(event.target===this)closeNfModal()">
+    <div class="panel w-full p-6 space-y-4" style="max-width:min(96vw, 90rem)">
+      <div class="flex items-center justify-between pb-4 gap-4 flex-wrap" style="border-bottom:1px solid var(--border)">
+        <div class="flex items-center space-x-3 min-w-0">
+          <div class="brand-icon" style="width:2.5rem;height:2.5rem;border-radius:.75rem;--x:0">
+            <i class="fa-solid fa-file-invoice"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 id="nf-modal-title" class="font-extrabold text-lg truncate"></h3>
+            <p id="nf-modal-sub" class="text-xs t-muted"></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="nf-modal-situacao" class="badge"></span>
+          <span id="nf-modal-count" class="badge st-ENVIADO font-mono"></span>
+        </div>
+      </div>
+      <div class="tbl-wrap" style="max-height:60vh; overflow:auto">
+        <table class="tbl">
+          <thead><tr id="nf-modal-head"></tr></thead>
+          <tbody id="nf-modal-body" class="font-mono"></tbody>
+        </table>
+      </div>
+      <div class="pt-4 text-right" style="border-top:1px solid var(--border)">
+        <button onclick="closeNfModal()" class="btn"><i class="fa-solid fa-xmark"></i> Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: OCORRÊNCIAS DO CLIENTE (aberto a partir do Top 5) -->
   <div id="client-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(10,15,30,.65); backdrop-filter: blur(6px);" onclick="if(event.target===this)closeClientModal()">
     <div class="panel w-full p-6 space-y-4" style="max-width:min(96vw, 90rem)">
@@ -969,17 +1009,15 @@
     const RANGE = "Controle de Canhotos!A2:L";
     // Origem dos CARDS: aba "Base Final" (a tabela continua vindo de "Controle de Canhotos").
     // Ajuste os índices das colunas (0 = A, 1 = B, ...) se o layout da "Base Final" for diferente.
-    const RANGE_CARDS = "Base Final!A2:L";
+    const RANGE_CARDS = "Base Final!A1:L";   // linha 1 = cabeçalho (usado nos títulos da tabela de movimentações da NF)
     // Layout da "Base Final" (0 = A, 1 = B, ...): B = Filial/Empresa | D = Nº da Nota | J = Status | K = Observação | L = Data
     const CARDS_COL = { data: 11, filial: 1, nf: 3, statusAuto: 9 };
     // Letreiro: uma nota que tenha QUALQUER linha com status RESOLVIDO é considerada resolvida (não entra nas pendentes).
     // Troque para false para considerar pendente toda nota que tenha ao menos uma linha diferente de RESOLVIDO.
     const NOTA_RESOLVIDA_EM_QUALQUER_LINHA = true;
     let cardsData = null;                             // null = ainda não carregado / falhou
-    // Card "TOTAL SEM ASSINATURA" e letreiro: aba "Controle de Canhotos" (colunas A = Data | K = Status Automático)
-    const CONTROLE_COL = { data: 0, filial: 1, statusAuto: 10 };
-    let controleData = [];
-    let baseFinalRows = null;  // linhas brutas da aba "Base Final" (usadas pelo letreiro); null = indisponível
+    let baseFinalHeader = [];  // cabeçalho (linha 1) da aba "Base Final"
+    let baseFinalRows = null;  // linhas brutas da aba "Base Final" (sem o cabeçalho); null = indisponível
 
     // Seletor de empresa — filtra pela coluna B (Filial): ANDRADE = "1" | META = "F1" | TODAS = sem filtro
     let company = 'todas';
@@ -995,7 +1033,7 @@
     function setCompany(key) {
       company = key;
       Object.keys(COMPANIES).forEach(k => document.getElementById('btn-emp-' + k).classList.toggle('active', k === key));
-      updatePendingSummary(baseFinalRows);   // letreiro
+      updatePendingSummary();   // letreiro
       renderConsultaTable();                  // cards, tabela e dashboard
     }
     // Cole aqui a URL do Web App (termina em /exec). Veja o passo a passo no início deste arquivo.
@@ -1036,6 +1074,7 @@
         if (ev.key !== 'Escape') return;
         // Esc fecha primeiro a janela do cliente; se não houver, fecha o Top 5
         if (!document.getElementById('client-modal').classList.contains('hidden')) closeClientModal();
+        else if (!document.getElementById('nf-modal').classList.contains('hidden')) closeNfModal();
         else closeTop5Modal();
       });
       document.getElementById('login-user').addEventListener('keydown', (ev) => {
@@ -1153,17 +1192,9 @@
         const response = await fetch(url);
         const result = await response.json();
         if (result.error) throw new Error(result.error.message);
-        baseFinalRows = await loadCardsData();   // aba "Base Final" (demais cards + letreiro)
-        // aba "Controle de Canhotos" (card TOTAL SEM ASSINATURA + letreiro): toda linha com algum dado
-        controleData = (result.values || [])
-          .filter(row => row.some(cell => String(cell || '').trim() !== ''))
-          .map(row => ({
-            data: String(row[CONTROLE_COL.data] || '').trim(),
-            filial: String(row[CONTROLE_COL.filial] || '').trim(),
-            statusAuto: String(row[CONTROLE_COL.statusAuto] || '').trim().toUpperCase()
-          }));
+        baseFinalRows = await loadCardsData();   // aba "Base Final" (cards, letreiro, dashboard e busca de NF)
         if (result.values) {
-          updatePendingSummary(baseFinalRows);
+          updatePendingSummary();
           const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
           
           rawData = result.values.map((row, index) => {
@@ -1192,7 +1223,7 @@
           if (!silent) showToast('Dados da Planilha Sincronizados!', 'success');
         } else {
           rawData = [];
-          updatePendingSummary(baseFinalRows);
+          updatePendingSummary();
           renderConsultaTable();
         }
         setApiStatus('ok');
@@ -1203,21 +1234,26 @@
       showLoading(false);
     }
 
-    // Lê a aba "Base Final" (origem dos cards, exceto "TOTAL SEM ASSINATURA"). Retorna as linhas brutas ou null se falhar.
+    // Lê a aba "Base Final" (origem de todas as contagens). Retorna as linhas brutas (sem cabeçalho) ou null se falhar.
+    // Status vazio é tratado como PENDENTE nos cálculos.
     async function loadCardsData() {
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE_CARDS)}?key=${API_KEY}`;
       try {
         const r = await (await fetch(url)).json();
         if (r.error) throw new Error(r.error.message);
-        const rows = (r.values || []).filter(row => row.some(cell => String(cell || '').trim() !== ''));
+        const all = r.values || [];
+        baseFinalHeader = all[0] || [];
+        const rows = all.slice(1).filter(row => row.some(cell => String(cell || '').trim() !== ''));
         cardsData = rows.map(row => ({
           data: String(row[CARDS_COL.data] || '').trim(),
           filial: String(row[CARDS_COL.filial] || '').trim(),
-          statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase()
+          nf: String(row[CARDS_COL.nf] || '').trim().toUpperCase(),
+          statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase() || 'PENDENTE'
         }));
         return rows;
       } catch (err) {
         cardsData = null;
+        baseFinalHeader = [];
         showToast('Erro ao ler a aba "Base Final": ' + err.message, 'error');
         return null;
       }
@@ -1252,14 +1288,14 @@
      * Considera como PENDENTE toda linha válida da planilha em que a Coluna K (statusAuto)
      * é DIFERENTE DE "RESOLVIDO", incluindo valores em branco ou vazios ("").
      */
-    // Letreiro — calculado na aba "Base Final", por NOTA distinta (coluna D), sem filtro de data (só empresa):
-    //  • pendente = nota sem nenhuma linha RESOLVIDO (várias linhas da mesma nota contam uma única vez)
+    // Letreiro — calculado na aba "Base Final", por NOTA distinta, sem filtro de data (só empresa):
+    //  • pendente = nota sem nenhuma linha RESOLVIDO (várias linhas da mesma nota contam uma única vez; status vazio = pendente)
     //  • mais de 7 dias / nota mais antiga = pela data da coluna L (menor data entre as linhas da nota)
-    function updatePendingSummary(rows) {
+    function updatePendingSummary() {
       marqueeMessages = [];
       const emp = company === 'todas' ? '' : `<strong>${COMPANIES[company].label}</strong> · `;
 
-      if (!rows) {
+      if (!cardsData) {
         marqueeMessages.push('<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ' + emp + 'Aba "Base Final" indisponível — letreiro sem dados');
         currentMarqueeIndex = 0;
         startMarqueeAnimation();
@@ -1268,33 +1304,13 @@
 
       const now = new Date();
       const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-      const notas = new Map();   // nº da nota -> { resolvida, ts (menor data entre as linhas não resolvidas) }
-
-      rows.forEach(row => {
-        if (!row.some(cell => String(cell || '').trim() !== '')) return;   // linha vazia
-        if (!matchesCompany(row[CARDS_COL.filial])) return;                // empresa selecionada
-        const nf = String(row[CARDS_COL.nf] || '').trim().toUpperCase();
-        if (!nf) return;                                                   // sem nº de nota não dá para identificar
-
-        const st = String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase();
-        let n = notas.get(nf);
-        if (!n) { n = { resolvida: false, pendente: false, ts: null }; notas.set(nf, n); }
-        if (st === 'RESOLVIDO') { n.resolvida = true; return; }
-
-        n.pendente = true;                                                 // qualquer status diferente de RESOLVIDO (inclui vazio)
-        const ts = parseSheetDate(row[CARDS_COL.data]);                    // Coluna L
-        if (ts !== null && (n.ts === null || ts < n.ts)) n.ts = ts;
-      });
-
-      let pending = 0, over7 = 0, oldestTs = null, oldestNfs = [];
-      notas.forEach((n, nf) => {
-        if (!n.pendente) return;
-        if (NOTA_RESOLVIDA_EM_QUALQUER_LINHA && n.resolvida) return;
-        pending++;
+      const notas = pendingNotas();
+      let pending = notas.length, over7 = 0, oldestTs = null, oldestNfs = [];
+      notas.forEach(n => {
         if (n.ts === null) return;
         if (Math.round((todayUTC - n.ts) / 86400000) > 7) over7++;
-        if (oldestTs === null || n.ts < oldestTs) { oldestTs = n.ts; oldestNfs = [nf]; }
-        else if (n.ts === oldestTs) oldestNfs.push(nf);
+        if (oldestTs === null || n.ts < oldestTs) { oldestTs = n.ts; oldestNfs = [n.nf]; }
+        else if (n.ts === oldestTs) oldestNfs.push(n.nf);
       });
 
       if (pending === 0) {
@@ -1462,19 +1478,43 @@
       return filterByRange(activeFilters.start, activeFilters.end);
     }
 
-    // Dados dos cards no período consultado (critério de data obedecido nas duas origens):
-    //  base = aba "Base Final" (todos os cards, exceto o abaixo) | sem = aba "Controle de Canhotos" (TOTAL SEM ASSINATURA)
-    function getCardsData() {
-      if (!hasSearched) return { base: null, sem: null };
-      return {
-        base: cardsData ? filterByRange(activeFilters.start, activeFilters.end, cardsData) : null,
-        sem: filterByRange(activeFilters.start, activeFilters.end, controleData)
-      };
+    // Notas pendentes de assinatura na "Base Final" (empresa selecionada, SEM filtro de data):
+    // uma entrada por NOTA distinta; pendente = nota sem nenhuma linha RESOLVIDO (status vazio = pendente).
+    // ts = menor data (coluna L) entre as linhas pendentes da nota.
+    function pendingNotas() {
+      const notas = new Map();
+      (cardsData || []).forEach(item => {
+        if (!matchesCompany(item.filial) || !item.nf) return;
+        let n = notas.get(item.nf);
+        if (!n) { n = { nf: item.nf, resolvida: false, pendente: false, ts: null }; notas.set(item.nf, n); }
+        if (item.statusAuto === 'RESOLVIDO') { n.resolvida = true; return; }
+        n.pendente = true;
+        const ts = parseSheetDate(item.data);
+        if (ts !== null && (n.ts === null || ts < n.ts)) n.ts = ts;
+      });
+      return [...notas.values()].filter(n => n.pendente && !(NOTA_RESOLVIDA_EM_QUALQUER_LINHA && n.resolvida));
     }
 
+    // Dados dos cards no período consultado — tudo vindo da aba "Base Final":
+    //  base = linhas (ocorrências) por status | sem = notas distintas pendentes de assinatura (data da nota dentro do período)
+    function getCardsData() {
+      if (!hasSearched || !cardsData) return { base: null, sem: null };
+      const { start, end } = activeFilters;
+      const sem = pendingNotas().filter(n => {
+        const iso = n.ts === null ? null : utcToIso(n.ts);
+        if (start && (!iso || iso < start)) return false;
+        if (end && (!iso || iso > end)) return false;
+        return true;
+      });
+      return { base: filterByRange(start, end, cardsData), sem };
+    }
+
+    // Status vazio conta como PENDENTE (pendente de assinatura) em todos os cálculos
+    function stOf(item) { return item.statusAuto || 'PENDENTE'; }
+
     function matchesStatus(item, key) {
-      if (key === 'SEM_ASSINATURA') return item.statusAuto !== 'RESOLVIDO';
-      return item.statusAuto === key;
+      if (key === 'SEM_ASSINATURA') return stOf(item) !== 'RESOLVIDO';
+      return stOf(item) === key;
     }
 
     // Dados da tabela: período + (card/status escolhido) ou, se nenhum, os status do modo atual
@@ -1484,7 +1524,7 @@
       const scope = FLOW_MODES[flowMode].scope;
       return getDateFilteredData().filter(item => {
         if (st !== 'TODOS') return matchesStatus(item, st);
-        return !scope || scope.includes(item.statusAuto);
+        return !scope || scope.includes(stOf(item));
       });
     }
 
@@ -1547,8 +1587,9 @@
 
       grid.innerHTML = keys.map(key => {
         const meta = CARD_META[key] || { label: key, icon: statusIcons[key] || 'fa-folder' };
-        const src = key === 'SEM_ASSINATURA' ? semList : baseList;
-        const total = src ? src.filter(item => matchesStatus(item, key)).length : '—';
+        const total = key === 'SEM_ASSINATURA'
+          ? (semList ? semList.length : '—')
+          : (baseList ? baseList.filter(item => matchesStatus(item, key)).length : '—');
         const sel = hasSearched && activeFilters.status === key;
         return `
         <div class="metal clickable m-${key} ${sel ? 'selected' : ''}" role="button" tabindex="0" aria-pressed="${sel}"
@@ -1770,6 +1811,48 @@
       document.getElementById('client-modal').classList.remove('hidden');
     }
 
+    const escHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    // Busca uma NF na aba "Base Final" e mostra todas as movimentações dela (independe de período, empresa e modo)
+    function searchNf() {
+      const nf = document.getElementById('filter-nf').value.trim().toUpperCase();
+      if (!nf) return showToast('Informe o número da NF.', 'warn');
+      if (!baseFinalRows) return showToast('A aba "Base Final" não está disponível.', 'error');
+
+      const rows = baseFinalRows
+        .filter(row => String(row[CARDS_COL.nf] || '').trim().toUpperCase() === nf)
+        .sort((a, b) => {
+          const ta = parseSheetDate(a[CARDS_COL.data]), tb = parseSheetDate(b[CARDS_COL.data]);
+          if (ta === tb) return 0;
+          if (ta === null) return 1;
+          if (tb === null) return -1;
+          return ta - tb;
+        });
+
+      const cols = 12; // A:L
+      const colName = i => (baseFinalHeader[i] && String(baseFinalHeader[i]).trim()) || ('Coluna ' + String.fromCharCode(65 + i));
+      document.getElementById('nf-modal-head').innerHTML = Array.from({ length: cols }, (_, i) => `<th>${escHtml(colName(i))}</th>`).join('');
+      document.getElementById('nf-modal-body').innerHTML = rows.length
+        ? rows.map(row => '<tr>' + Array.from({ length: cols }, (_, i) =>
+            i === CARDS_COL.statusAuto ? `<td>${renderStatusBadge(String(row[i] || '').trim())}</td>` : `<td>${escHtml(row[i])}</td>`
+          ).join('') + '</tr>').join('')
+        : `<tr><td colspan="${cols}" class="p-8 text-center t-muted italic">Nenhuma movimentação encontrada para a NF ${escHtml(nf)}.</td></tr>`;
+
+      const resolvida = rows.some(row => String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase() === 'RESOLVIDO');
+      document.getElementById('nf-modal-title').textContent = 'Movimentações da NF ' + nf;
+      document.getElementById('nf-modal-sub').textContent = 'Todas as linhas da aba "Base Final", da mais antiga para a mais recente';
+      document.getElementById('nf-modal-count').textContent = `${rows.length} movimentaç${rows.length === 1 ? 'ão' : 'ões'}`;
+      const sit = document.getElementById('nf-modal-situacao');
+      sit.style.display = rows.length ? '' : 'none';
+      sit.className = 'badge ' + (resolvida ? 'st-RESOLVIDO' : 'st-PENDENTE');
+      sit.textContent = resolvida ? 'NOTA RESOLVIDA' : 'PENDENTE DE ASSINATURA';
+      document.getElementById('nf-modal').classList.remove('hidden');
+    }
+
+    function closeNfModal() {
+      document.getElementById('nf-modal').classList.add('hidden');
+    }
+
     function closeClientModal() {
       document.getElementById('client-modal').classList.add('hidden');
     }
@@ -1843,7 +1926,7 @@
 
     // Período consultado e o período equivalente do mês anterior (mesma quantidade de dias)
     function getComparisonPeriods() {
-      const isos = rawData.filter(i => matchesCompany(i.filial)).map(itemIso).filter(Boolean).sort();
+      const isos = (cardsData || []).filter(i => matchesCompany(i.filial)).map(itemIso).filter(Boolean).sort();
       const n = new Date();
       const todayIso = utcToIso(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()));
       const start = activeFilters.start || isos[0] || todayIso;
@@ -1859,7 +1942,7 @@
       const c = {};
       DASH_STATUSES.forEach(s => { c[s] = 0; });
       c['SEM STATUS'] = 0;
-      list.forEach(item => { c[DASH_STATUSES.includes(item.statusAuto) ? item.statusAuto : 'SEM STATUS']++; });
+      list.forEach(item => { c[DASH_STATUSES.includes(stOf(item)) ? stOf(item) : 'SEM STATUS']++; });
       return c;
     }
 
@@ -1891,8 +1974,9 @@
       destroyDashCharts();
 
       const per = getComparisonPeriods();
-      const cur = getDateFilteredData();
-      const prev = filterByRange(per.prevStart, per.prevEnd);
+      const src = cardsData || [];   // aba "Base Final"
+      const cur = filterByRange(activeFilters.start, activeFilters.end, src);
+      const prev = filterByRange(per.prevStart, per.prevEnd, src);
       const cCur = countByStatus(cur);
       const cPrev = countByStatus(prev);
 
