@@ -1009,7 +1009,9 @@
     const RANGE = "Controle de Canhotos!A2:L";
     // Origem dos CARDS: aba "Base Final" (a tabela continua vindo de "Controle de Canhotos").
     // Ajuste os índices das colunas (0 = A, 1 = B, ...) se o layout da "Base Final" for diferente.
-    const RANGE_CARDS = "Base Final!A1:L";   // linha 1 = cabeçalho (usado nos títulos da tabela de movimentações da NF)
+    const RANGE_CARDS = "Base Final!A1:L";
+    const BASE_FINAL_FIRST_ROW = 9;    // os dados da "Base Final" começam na linha 9
+    const BASE_FINAL_HEADER_ROW = 8;   // linha usada como títulos das colunas na tabela de movimentações da NF
     // Layout da "Base Final" (0 = A, 1 = B, ...): B = Filial/Empresa | D = Nº da Nota | J = Status | K = Observação | L = Data
     const CARDS_COL = { data: 11, filial: 1, nf: 3, statusAuto: 9 };
     // Letreiro: uma nota que tenha QUALQUER linha com status RESOLVIDO é considerada resolvida (não entra nas pendentes).
@@ -1022,13 +1024,13 @@
     // Seletor de empresa — filtra pela coluna B (Filial): ANDRADE = "1" | META = "F1" | TODAS = sem filtro
     let company = 'todas';
     const COMPANIES = {
-      andrade: { label: 'ANDRADE',           code: '1'  },
-      meta:    { label: 'META',              code: 'F1' },
-      todas:   { label: 'TODAS AS EMPRESAS', code: null }
+      andrade: { label: 'ANDRADE',           codes: ['1']         },
+      meta:    { label: 'META',              codes: ['M2', 'F1']  },   // "M2" na Base Final ("F1" mantido por compatibilidade)
+      todas:   { label: 'TODAS AS EMPRESAS', codes: null         }
     };
     function matchesCompany(filial) {
-      const code = COMPANIES[company].code;
-      return code === null || String(filial || '').trim().toUpperCase() === code;
+      const codes = COMPANIES[company].codes;
+      return codes === null || codes.includes(String(filial || '').trim().toUpperCase());
     }
     function setCompany(key) {
       company = key;
@@ -1235,20 +1237,20 @@
     }
 
     // Lê a aba "Base Final" (origem de todas as contagens). Retorna as linhas brutas (sem cabeçalho) ou null se falhar.
-    // Status vazio é tratado como PENDENTE nos cálculos.
+    // Status vazio NÃO é o status PENDENTE: conta apenas como "sem assinatura" (TOTAL SEM ASSINATURA e letreiro).
     async function loadCardsData() {
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE_CARDS)}?key=${API_KEY}`;
       try {
         const r = await (await fetch(url)).json();
         if (r.error) throw new Error(r.error.message);
         const all = r.values || [];
-        baseFinalHeader = all[0] || [];
-        const rows = all.slice(1).filter(row => row.some(cell => String(cell || '').trim() !== ''));
+        baseFinalHeader = all[BASE_FINAL_HEADER_ROW - 1] || [];
+        const rows = all.slice(BASE_FINAL_FIRST_ROW - 1).filter(row => row.some(cell => String(cell || '').trim() !== ''));
         cardsData = rows.map(row => ({
           data: String(row[CARDS_COL.data] || '').trim(),
           filial: String(row[CARDS_COL.filial] || '').trim(),
           nf: String(row[CARDS_COL.nf] || '').trim().toUpperCase(),
-          statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase() || 'PENDENTE'
+          statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase()
         }));
         return rows;
       } catch (err) {
@@ -1289,7 +1291,7 @@
      * é DIFERENTE DE "RESOLVIDO", incluindo valores em branco ou vazios ("").
      */
     // Letreiro — calculado na aba "Base Final", por NOTA distinta, sem filtro de data (só empresa):
-    //  • pendente = nota sem nenhuma linha RESOLVIDO (várias linhas da mesma nota contam uma única vez; status vazio = pendente)
+    //  • pendente = nota sem nenhuma linha RESOLVIDO (várias linhas da mesma nota contam uma única vez; status vazio também conta)
     //  • mais de 7 dias / nota mais antiga = pela data da coluna L (menor data entre as linhas da nota)
     function updatePendingSummary() {
       marqueeMessages = [];
@@ -1479,7 +1481,7 @@
     }
 
     // Notas pendentes de assinatura na "Base Final" (empresa selecionada, SEM filtro de data):
-    // uma entrada por NOTA distinta; pendente = nota sem nenhuma linha RESOLVIDO (status vazio = pendente).
+    // uma entrada por NOTA distinta; pendente de assinatura = nota sem nenhuma linha RESOLVIDO (status vazio também conta).
     // ts = menor data (coluna L) entre as linhas pendentes da nota.
     function pendingNotas() {
       const notas = new Map();
@@ -1509,8 +1511,9 @@
       return { base: filterByRange(start, end, cardsData), sem };
     }
 
-    // Status vazio conta como PENDENTE (pendente de assinatura) em todos os cálculos
-    function stOf(item) { return item.statusAuto || 'PENDENTE'; }
+    // Status exatamente como está na planilha. Atenção: "PENDENTE" (status explícito) é diferente de
+    // "sem assinatura" (qualquer status diferente de RESOLVIDO, inclusive vazio).
+    function stOf(item) { return item.statusAuto; }
 
     function matchesStatus(item, key) {
       if (key === 'SEM_ASSINATURA') return stOf(item) !== 'RESOLVIDO';
