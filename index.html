@@ -15,13 +15,17 @@
      Editar > Nova versão (a URL continua a mesma).
 
   ---------------------- Code.gs ----------------------
+  // VERSÃO 2 — grava na aba "Base Final": J = Status | K = Observação | L = Data da alteração
   const SHEET_ID   = '1o4_kUnBmgnbYFbsf6Zv2_0m_iUpPHNT6Vk3xNCEc0xE';
-  const ABA        = 'Controle de Canhotos';
-  const COL_STATUS = 10; // J - Status Manual
-  const COL_OBS    = 12; // L - Observação
+  const ABA        = 'Base Final';
+  const PRIMEIRA   = 9;   // primeira linha de dados
+  const COL_STATUS = 10;  // J - Status
+  const COL_OBS    = 11;  // K - Observação
+  const COL_DATA   = 12;  // L - Data em que a alteração foi feita pelo painel
   const PERMITIDOS = ['PENDENTE','ENVIADO','IMPRESSO','RETORNO','TRANSFERIR','RESOLVIDO'];
+  const VERSAO     = 2;
 
-  function doGet() { return saida_({ ok: true, msg: 'Web App ativo' }); }
+  function doGet() { return saida_({ ok: true, msg: 'Web App ativo', versao: VERSAO, aba: ABA }); }
 
   function doPost(e) {
     const lock = LockService.getScriptLock();
@@ -37,27 +41,26 @@
     }
   }
 
+  // updates: [{ row: nº real da linha na planilha, status, obs (opcional), data: 'dd/mm/aaaa' }]
   function atualizarLinhas(updates) {
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(ABA);
     if (!sh) throw new Error('Aba não encontrada: ' + ABA);
     const last = sh.getLastRow();
-    if (last < 2) return { ok: true, updated: 0 };
-    const n = last - 1;
-    const rngJ = sh.getRange(2, COL_STATUS, n, 1);
-    const rngL = sh.getRange(2, COL_OBS, n, 1);
-    const J = rngJ.getValues();
-    const L = rngL.getValues();
-    let count = 0, mexeuL = false;
+    let count = 0;
     updates.forEach(function (u) {
-      const i = Number(u.row) - 2;
+      const row = Number(u.row);
       const st = String(u.status || '').toUpperCase();
-      if (!(i >= 0 && i < n) || PERMITIDOS.indexOf(st) < 0) return;
-      J[i][0] = st;
-      if (u.obs !== undefined) { L[i][0] = u.obs; mexeuL = true; }
+      if (!(row >= PRIMEIRA && row <= last) || PERMITIDOS.indexOf(st) < 0) return;
+      sh.getRange(row, COL_STATUS).setValue(st);
+      if (u.obs !== undefined) sh.getRange(row, COL_OBS).setValue(u.obs);
+      const d = String(u.data || '').split('/');
+      if (d.length === 3) {
+        sh.getRange(row, COL_DATA)
+          .setValue(new Date(Number(d[2]), Number(d[1]) - 1, Number(d[0])))
+          .setNumberFormat('dd/mm/yyyy');
+      }
       count++;
     });
-    rngJ.setValues(J);
-    if (mexeuL) rngL.setValues(L);
     SpreadsheetApp.flush();
     return { ok: true, updated: count };
   }
@@ -67,7 +70,7 @@
       .setMimeType(ContentService.MimeType.JSON);
   }
   -----------------------------------------------------
-  Obs.: as colunas J e L devem conter valores digitados (não fórmulas).
+  Obs.: as colunas J, K e L da aba "Base Final" devem conter valores digitados (não fórmulas).
 =====================================================================
 -->
 <html lang="pt-BR" class="dark">
@@ -781,9 +784,9 @@
             <table class="tbl">
               <thead>
                 <tr>
-                  <th>Data</th><th>Filial</th><th>Nº Carga</th><th>Nº NF</th><th>Cód. Cliente</th>
+                  <th>Data Ocorrência</th><th>Filial</th><th>Nº Carga</th><th>Nº NF</th><th>Cód. Cliente</th>
                   <th>Razão Social</th><th>Motorista</th><th>Município/Bairro</th><th>Rota Principal</th>
-                  <th>Status Manual</th><th>Status Auto</th><th>Observação</th>
+                  <th>Status</th><th>Observação</th><th>Data Atualização</th>
                 </tr>
               </thead>
               <tbody id="table-body" class="font-mono"></tbody>
@@ -834,16 +837,16 @@
           <h3 class="sec-title"><i class="fa-solid fa-calendar-days"></i><span>1. Seleção do Período de Trabalho</span></h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="lbl">Data Inicial</label>
+              <label class="lbl">Data Inicial (Coluna A)</label>
               <input type="date" id="upd-period-start" onchange="checkNfInPeriod()" class="field" style="padding:.7rem .9rem">
             </div>
             <div>
-              <label class="lbl">Data Final</label>
+              <label class="lbl">Data Final (Coluna A)</label>
               <input type="date" id="upd-period-end" onchange="checkNfInPeriod()" class="field" style="padding:.7rem .9rem">
             </div>
           </div>
           <div class="divider pt-3 flex items-center justify-between flex-wrap gap-3">
-            <span class="text-xs t-muted">Atualizar todas as ocorrências do período (Coluna J) para o status escolhido:</span>
+            <span class="text-xs t-muted">Atualizar todas as ocorrências do período (data da Coluna A) para o status escolhido — grava a Coluna J e registra hoje na Coluna L:</span>
             <div class="flex items-center gap-3 flex-wrap">
               <select id="upd-bulk-status" onchange="onBulkStatusChange()" class="field" style="width:11rem; padding:.55rem .8rem">
                 <option value="">-- Status --</option>
@@ -875,7 +878,7 @@
             <div><span class="t-muted block">Motorista:</span><span id="det-motorista" class="font-semibold"></span></div>
           </div>
           <div>
-            <label class="lbl">Novo Status Manual (Reflete na Coluna J)</label>
+            <label class="lbl">Novo Status (grava na Coluna J)</label>
             <select id="upd-status-select" onchange="onStatusSelectChange()" class="field" style="padding:.8rem 1rem">
               <option value="">-- Selecione o Status --</option>
               <option value="PENDENTE">PENDENTE</option>
@@ -896,7 +899,7 @@
           <button id="btn-save" onclick="saveNfUpdate()" class="btn-primary sheen">
             <i class="fa-solid fa-floppy-disk"></i><span id="btn-save-label">GRAVAR ALTERAÇÃO</span>
           </button>
-          <p class="text-center text-[10px] t-muted mt-2">A alteração será aplicada na coluna J (Status Manual) e o painel atualizará em seguida.</p>
+          <p class="text-center text-[10px] t-muted mt-2">A alteração grava o status na coluna J, a observação na K e a data de hoje na L da aba "Base Final"; o painel atualiza em seguida.</p>
         </div>
       </section>
     </div>
@@ -987,9 +990,9 @@
         <table class="tbl">
           <thead>
             <tr>
-              <th>Data</th><th>Filial</th><th>Nº Carga</th><th>Nº NF</th><th>Cód. Cliente</th>
+              <th>Data Ocorrência</th><th>Filial</th><th>Nº Carga</th><th>Nº NF</th><th>Cód. Cliente</th>
               <th>Razão Social</th><th>Motorista</th><th>Município/Bairro</th><th>Rota Principal</th>
-              <th>Status Manual</th><th>Status Auto</th><th>Observação</th>
+              <th>Status</th><th>Observação</th><th>Data Atualização</th>
             </tr>
           </thead>
           <tbody id="client-modal-body" class="font-mono"></tbody>
@@ -1006,14 +1009,16 @@
 
     const API_KEY = "AIzaSyBwvNC2bf6Ix8atG07BhzcvxhlnhyiPgv4";
     const SHEET_ID = "1o4_kUnBmgnbYFbsf6Zv2_0m_iUpPHNT6Vk3xNCEc0xE";
-    const RANGE = "Controle de Canhotos!A2:L";
     // Origem dos CARDS: aba "Base Final" (a tabela continua vindo de "Controle de Canhotos").
     // Ajuste os índices das colunas (0 = A, 1 = B, ...) se o layout da "Base Final" for diferente.
     const RANGE_CARDS = "Base Final!A1:L";
     const BASE_FINAL_FIRST_ROW = 9;    // os dados da "Base Final" começam na linha 9
     const BASE_FINAL_HEADER_ROW = 8;   // linha usada como títulos das colunas na tabela de movimentações da NF
     // Layout da "Base Final" (0 = A, 1 = B, ...): B = Filial/Empresa | D = Nº da Nota | J = Status | K = Observação | L = Data
-    const CARDS_COL = { data: 11, filial: 1, nf: 3, statusAuto: 9 };
+    // Colunas da "Base Final" (0 = A, 1 = B, ...). C, E, F, G, H e I seguem o mesmo layout da antiga aba "Controle de Canhotos".
+    const BF = { dataOcorrencia: 0, filial: 1, carga: 2, nf: 3, cliente: 4, razao: 5, motorista: 6, municipio: 7, rota: 8, status: 9, obs: 10, dataAtualizacao: 11 };
+    // data = coluna L (consultas do painel) | statusAuto = coluna J (status)
+    const CARDS_COL = { data: BF.dataAtualizacao, filial: BF.filial, nf: BF.nf, statusAuto: BF.status };
     // Letreiro: uma nota que tenha QUALQUER linha com status RESOLVIDO é considerada resolvida (não entra nas pendentes).
     // Troque para false para considerar pendente toda nota que tenha ao menos uma linha diferente de RESOLVIDO.
     const NOTA_RESOLVIDA_EM_QUALQUER_LINHA = true;
@@ -1039,7 +1044,7 @@
       renderConsultaTable();                  // cards, tabela e dashboard
     }
     // Cole aqui a URL do Web App (termina em /exec). Veja o passo a passo no início deste arquivo.
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzr2TNc9FwgOYHD5ZRM7yWF7rJ963PHFwQpR0MyePDSHfivMM6F0p-3t-TwOlierQ6q/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxiU7U_rBCP5xOlNHSKFxOKHWOBdoeDwWk9xr7DEwCAtqwCPuKdoQNQxdj7a3nrXVLG/exec";
 
     const LOGIN_USER = "@teste";
     const LOGIN_PASS = "147852";
@@ -1186,79 +1191,62 @@
       txt.textContent = m[2];
     }
 
+    // Lê a aba "Base Final" (única origem: tabela, cards, dashboard, letreiro, busca de NF e ATUALIZAÇÃO).
+    // Os dados começam na linha BASE_FINAL_FIRST_ROW; rowIndex = nº real da linha na planilha.
     async function loadRealData(silent = false) {
       showLoading(true);
       setApiStatus('loading');
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE)}?key=${API_KEY}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE_CARDS)}?key=${API_KEY}`;
       try {
         const response = await fetch(url);
         const result = await response.json();
         if (result.error) throw new Error(result.error.message);
-        baseFinalRows = await loadCardsData();   // aba "Base Final" (cards, letreiro, dashboard e busca de NF)
-        if (result.values) {
-          updatePendingSummary();
-          const allowedStatus = ["PENDENTE", "ENVIADO", "IMPRESSO", "RETORNO", "TRANSFERIR", "RESOLVIDO", ""];
-          
-          rawData = result.values.map((row, index) => {
-            return {
-              rowIndex: index + 2,
-              data: row[0] || '',
-              filial: row[1] || '',
-              numCarga: row[2] || '',
-              numNf: String(row[3] || '').trim(),
-              codCliente: row[4] || '',
-              razaoSocial: row[5] || '',
-              nomeMotorista: row[6] || '',
-              municipioBairro: row[7] || '',
-              rotaPrincipal: row[8] || '',
-              statusManual: row[9] || '',
-              statusAuto: String(row[10] || '').trim().toUpperCase(),
-              observacao: row[11] || ''
-            };
-          }).filter(item => {
-            // Descarta linhas sem NF ou sem dados válidos
-            if (!item.numNf && !item.razaoSocial && !item.data) return false;
-            return allowedStatus.includes(item.statusAuto);
-          });
 
-          renderConsultaTable();
-          if (!silent) showToast('Dados da Planilha Sincronizados!', 'success');
-        } else {
-          rawData = [];
-          updatePendingSummary();
-          renderConsultaTable();
-        }
+        const all = result.values || [];
+        const txt = (row, i) => String(row[i] === undefined || row[i] === null ? '' : row[i]).trim();
+        baseFinalHeader = all[BASE_FINAL_HEADER_ROW - 1] || [];
+        baseFinalRows = [];
+        rawData = [];
+        all.forEach((row, index) => {
+          const rowNum = index + 1;
+          if (rowNum < BASE_FINAL_FIRST_ROW) return;
+          if (!row.some(cell => String(cell || '').trim() !== '')) return;   // linha vazia
+          baseFinalRows.push(row);
+          const numNf = txt(row, BF.nf);
+          rawData.push({
+            rowIndex: rowNum,
+            dataOcorrencia: txt(row, BF.dataOcorrencia),   // A — localiza a ocorrência na ATUALIZAÇÃO
+            filial: txt(row, BF.filial),                   // B — empresa
+            numCarga: txt(row, BF.carga),
+            numNf: numNf,
+            nf: numNf.toUpperCase(),
+            codCliente: txt(row, BF.cliente),
+            razaoSocial: txt(row, BF.razao),
+            nomeMotorista: txt(row, BF.motorista),
+            municipioBairro: txt(row, BF.municipio),
+            rotaPrincipal: txt(row, BF.rota),
+            statusAuto: txt(row, BF.status).toUpperCase(), // J — status
+            observacao: txt(row, BF.obs),                  // K — observação
+            data: txt(row, BF.dataAtualizacao)             // L — data usada nas consultas / data da alteração
+          });
+        });
+        cardsData = rawData;
+
+        updatePendingSummary();
+        renderConsultaTable();
+        if (!silent) showToast('Dados da Planilha Sincronizados!', 'success');
         setApiStatus('ok');
       } catch (err) {
-        setApiStatus('error');
-        showToast('Erro de API: ' + err.message, 'error');
-      }
-      showLoading(false);
-    }
-
-    // Lê a aba "Base Final" (origem de todas as contagens). Retorna as linhas brutas (sem cabeçalho) ou null se falhar.
-    // Status vazio NÃO é o status PENDENTE: conta apenas como "sem assinatura" (TOTAL SEM ASSINATURA e letreiro).
-    async function loadCardsData() {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(RANGE_CARDS)}?key=${API_KEY}`;
-      try {
-        const r = await (await fetch(url)).json();
-        if (r.error) throw new Error(r.error.message);
-        const all = r.values || [];
-        baseFinalHeader = all[BASE_FINAL_HEADER_ROW - 1] || [];
-        const rows = all.slice(BASE_FINAL_FIRST_ROW - 1).filter(row => row.some(cell => String(cell || '').trim() !== ''));
-        cardsData = rows.map(row => ({
-          data: String(row[CARDS_COL.data] || '').trim(),
-          filial: String(row[CARDS_COL.filial] || '').trim(),
-          nf: String(row[CARDS_COL.nf] || '').trim().toUpperCase(),
-          statusAuto: String(row[CARDS_COL.statusAuto] || '').trim().toUpperCase()
-        }));
-        return rows;
-      } catch (err) {
+        rawData = [];
+        baseFinalRows = null;
         cardsData = null;
         baseFinalHeader = [];
+        updatePendingSummary();
+        renderConsultaTable();
+        setApiStatus('error');
         showToast('Erro ao ler a aba "Base Final": ' + err.message, 'error');
-        return null;
       }
+      showLoading(false);
     }
 
     function showLoading(state) {
@@ -1316,10 +1304,10 @@
       });
 
       if (pending === 0) {
-        marqueeMessages.push('<i class="fa-solid fa-circle-check mq-ok"></i> ' + emp + '<span class="mq-ok">Nenhuma nota pendente de assinatura!</span>');
+        marqueeMessages.push('<i class="fa-solid fa-circle-check mq-ok"></i> ' + emp + '<span class="mq-ok">Nenhuma nota sem assinatura!</span>');
       } else {
-        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Notas pendentes de assinatura: <strong class="mq-warn">${pending}</strong>`);
-        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Pendentes com mais de 7 dias: <strong class="mq-danger">${over7}</strong>`);
+        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Total de notas sem assinatura: <strong class="mq-warn">${pending}</strong>`);
+        marqueeMessages.push(`<i class="fa-solid fa-triangle-exclamation mq-warn"></i> ${emp}Total de notas sem assinatura com mais de 7 dias: <strong class="mq-danger">${over7}</strong>`);
         if (oldestTs !== null) {
           const oldDays = Math.max(0, Math.round((todayUTC - oldestTs) / 86400000));
           const dayTxt = oldDays === 0 ? 'hoje' : (oldDays === 1 ? 'há 1 dia' : `há ${oldDays} dias`);
@@ -1525,8 +1513,14 @@
       if (!hasSearched) return [];
       const st = activeFilters.status;
       const scope = FLOW_MODES[flowMode].scope;
-      return getDateFilteredData().filter(item => {
-        if (st !== 'TODOS') return matchesStatus(item, st);
+      const list = getDateFilteredData();
+      // TOTAL SEM ASSINATURA: linhas das notas distintas que não têm RESOLVIDO em nenhuma linha (todos os status, exceto RESOLVIDO)
+      if (st === 'SEM_ASSINATURA') {
+        const nfs = new Set((getCardsData().sem || []).map(n => n.nf));
+        return list.filter(item => nfs.has(item.nf));
+      }
+      return list.filter(item => {
+        if (st !== 'TODOS') return stOf(item) === st;
         return !scope || scope.includes(stOf(item));
       });
     }
@@ -1556,7 +1550,7 @@
     function rowHtml(item) {
       return `
         <tr>
-          <td>${item.data || '-'}</td>
+          <td>${item.dataOcorrencia || '-'}</td>
           <td>${item.filial}</td>
           <td>${item.numCarga}</td>
           <td class="font-bold t-accent">${item.numNf}</td>
@@ -1565,9 +1559,9 @@
           <td class="font-sans t-muted">${item.nomeMotorista}</td>
           <td class="font-sans t-muted">${item.municipioBairro}</td>
           <td class="font-sans t-muted">${item.rotaPrincipal}</td>
-          <td>${renderStatusBadge(item.statusManual)}</td>
           <td>${renderStatusBadge(item.statusAuto)}</td>
           <td class="font-sans t-muted max-w-xs truncate">${item.observacao || '-'}</td>
+          <td>${item.data || '-'}</td>
         </tr>`;
     }
 
@@ -1578,7 +1572,7 @@
       el.innerHTML =
         `<span class="badge st-ENVIADO">${FLOW_MODES[flowMode].label.toUpperCase()}</span>` +
         `<span class="t-muted">Exibindo:</span> <strong>${st === 'TODOS' ? 'todos os status do modo' : statusLabel(st)}</strong>` +
-        `<span class="t-muted">· ${data.length} registro(s)</span>` +
+        `<span class="t-muted">· ${data.length} linha(s) · ${new Set(data.map(i => i.nf)).size} nota(s) distinta(s)</span>` +
         (st !== 'TODOS' ? `<button class="btn" style="padding:.2rem .65rem; font-size:.68rem" onclick="clearStatusFilter()"><i class="fa-solid fa-xmark"></i>Remover filtro</button>` : '');
       el.classList.remove('hidden');
     }
@@ -2107,7 +2101,22 @@
         return;
       }
 
-      const match = rawData.find(item => item.numNf.toLowerCase() === nfInput.toLowerCase());
+      // Localiza a ocorrência pela data da coluna A. Se a NF tiver várias linhas, vale a mais recente dentro do período
+      // (sem período informado, a mais recente da NF).
+      const rows = rawData.filter(item => item.numNf.toLowerCase() === nfInput.toLowerCase());
+      rows.sort((a, b) => {
+        const ta = parseSheetDate(a.dataOcorrencia), tb = parseSheetDate(b.dataOcorrencia);
+        if (ta !== tb) { if (ta === null) return 1; if (tb === null) return -1; return tb - ta; }
+        return b.rowIndex - a.rowIndex;
+      });
+      const inRange = item => {
+        const iso = itemIsoA(item);
+        if (pStart && (!iso || iso < pStart)) return false;
+        if (pEnd && (!iso || iso > pEnd)) return false;
+        return true;
+      };
+      const inPeriodRows = rows.filter(inRange);
+      const match = inPeriodRows[0] || rows[0] || null;
       currentNfMatch = match;
       badge.classList.remove('hidden');
 
@@ -2118,24 +2127,21 @@
         return;
       }
 
-      document.getElementById('det-data').innerText = match.data || '-';
+      document.getElementById('det-data').innerText = match.dataOcorrencia || '-';
       document.getElementById('det-cliente').innerText = `${match.razaoSocial} (${match.codCliente})`;
       document.getElementById('det-filial').innerText = match.filial || '-';
       document.getElementById('det-motorista').innerText = match.nomeMotorista || '-';
       detailsCard.classList.remove('hidden');
 
-      let inPeriod = true;
-      let itemDateStr = match.data.split('/').reverse().join('-');
-      if (match.data.includes('-')) itemDateStr = match.data;
-      if (pStart && itemDateStr < pStart) inPeriod = false;
-      if (pEnd && itemDateStr > pEnd) inPeriod = false;
-
-      if (inPeriod) {
+      const extra = rows.length > 1
+        ? ` Esta NF tem ${rows.length} linhas; será atualizada a ocorrência mais recente (linha ${match.rowIndex}, data ${match.dataOcorrencia || '-'}).`
+        : '';
+      if (inPeriodRows.length > 0) {
         badge.className = "alert alert-ok";
-        badge.innerHTML = `<i class="fa-solid fa-circle-check fa-lg"></i><span>NF encontrada no período selecionado.</span>`;
+        badge.innerHTML = `<i class="fa-solid fa-circle-check fa-lg"></i><span>NF encontrada no período selecionado.${extra}</span>`;
       } else {
         badge.className = "alert alert-warn";
-        badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation fa-lg"></i><span>NF encontrada, mas <strong>FORA</strong> do período selecionado!</span>`;
+        badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation fa-lg"></i><span>NF encontrada, mas <strong>FORA</strong> do período selecionado!${extra}</span>`;
       }
     }
 
@@ -2155,6 +2161,40 @@
     function hasGoogleRun() { return typeof google !== 'undefined' && google.script && google.script.run; }
     function hasBackend() { return hasGoogleRun() || !!WEB_APP_URL; }
 
+    let backendChecked = false;
+    // Garante que o Web App já está na versão 2 (grava na "Base Final"); evita gravar na aba/linhas erradas com o script antigo
+    async function ensureBackendVersion() {
+      if (backendChecked) return;
+      let info;
+      try {
+        info = await (await fetch(WEB_APP_URL, { redirect: 'follow' })).json();
+      } catch (e) {
+        throw new Error('Sem resposta do Web App. Confira a URL e se a implantação está com acesso "Qualquer pessoa".');
+      }
+      if (!info || info.versao !== 2) throw new Error('O Web App ainda está na versão antiga. Cole o novo Code.gs (instruções no topo do arquivo) e publique uma nova versão da implantação.');
+      backendChecked = true;
+    }
+
+    function hojeBr() {
+      const d = new Date();
+      return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+    }
+
+    // Ocorrências pela data da coluna A (e empresa selecionada) — usadas na atualização em lote
+    function itemIsoA(item) {
+      const ts = parseSheetDate(item.dataOcorrencia);
+      return ts === null ? null : new Date(ts).toISOString().slice(0, 10);
+    }
+    function filterByRangeA(start, end) {
+      return rawData.filter(item => {
+        if (!matchesCompany(item.filial)) return false;
+        const iso = itemIsoA(item);
+        if (start && (!iso || iso < start)) return false;
+        if (end && (!iso || iso > end)) return false;
+        return true;
+      });
+    }
+
     async function persistUpdates(updates) {
       if (hasGoogleRun()) {
         return new Promise((resolve, reject) => {
@@ -2165,6 +2205,7 @@
         });
       }
       if (WEB_APP_URL) {
+        await ensureBackendVersion();
         let r;
         try {
           // text/plain evita o "preflight" de CORS, que o Apps Script não responde
@@ -2203,10 +2244,11 @@
       const item = currentNfMatch;
       setSaving(true);
       try {
-        await persistUpdates([{ row: item.rowIndex, status: status, obs: obs, colStatus: 'J' }]);
+        await persistUpdates([{ row: item.rowIndex, status: status, obs: obs, data: hojeBr() }]);
 
-        item.statusManual = status;
+        item.statusAuto = status;
         item.observacao = obs;
+        item.data = hojeBr();
 
         document.getElementById('upd-nf-input').value = '';
         document.getElementById('upd-status-select').value = '';
@@ -2214,7 +2256,7 @@
         onStatusSelectChange();
         checkNfInPeriod();
 
-        // Relê a planilha: atualiza tabela, cards, Status Auto (coluna K) e letreiro
+        // Relê a planilha: atualiza tabela, cards, dashboard e letreiro
         await loadRealData(true);
         showToast(`NF ${item.numNf} gravada na planilha!`, 'success');
       } catch (err) {
@@ -2237,7 +2279,7 @@
       if (pStart > pEnd) return showToast('A Data Inicial não pode ser maior que a Data Final.', 'error');
       if (!newStatus) return showToast('Escolha o status que será aplicado ao período.', 'error');
 
-      const targets = filterByRange(pStart, pEnd);
+      const targets = filterByRangeA(pStart, pEnd);   // pela data da coluna A
 
       if (targets.length === 0) return showToast('Nenhum registro encontrado no período.', 'error');
       if (!confirm(`Atualizar ${targets.length} ocorrência(s) do período selecionado${company === 'todas' ? '' : ' (empresa ' + COMPANIES[company].label + ')'} para "${newStatus}"?`)) return;
@@ -2246,15 +2288,15 @@
       try {
         const BATCH = 200;
         for (let i = 0; i < targets.length; i += BATCH) {
-          const chunk = targets.slice(i, i + BATCH).map(it => ({ row: it.rowIndex, status: newStatus, colStatus: 'J' }));
+          const chunk = targets.slice(i, i + BATCH).map(it => ({ row: it.rowIndex, status: newStatus, data: hojeBr() }));
           await persistUpdates(chunk);
         }
 
-        targets.forEach(it => { it.statusManual = newStatus; });
+        targets.forEach(it => { it.statusAuto = newStatus; it.data = hojeBr(); });
 
         // Relê a planilha para refletir exatamente o que foi gravado
         await loadRealData(true);
-        showToast(`${targets.length} registros gravados na planilha como "${newStatus}"!`, 'success');
+        showToast(`${targets.length} registros gravados na planilha como "${newStatus}" (data de hoje na coluna L)!`, 'success');
       } catch (err) {
         showToast('Erro ao gravar: ' + err.message, 'error');
       }
